@@ -8,7 +8,15 @@ from typing import List, Dict, Any, TypedDict
 from config import AppConfig
 from constants import GROQ_API_KEY
 from logger import setup_logger
-from tools import book_appointment, get_next_available_appointment, cancel_appointment
+from enhanced_tools import (
+    book_appointment,
+    get_next_available_appointment,
+    get_optimal_appointment_slots,
+    get_wait_time_prediction,
+    get_busiest_times,
+    get_least_busy_times,
+    cancel_appointment
+)
 
 logger = setup_logger(__name__)
 
@@ -103,9 +111,17 @@ def preprocess_llm_output(state: AgentState) -> AgentState:
         state["messages"][-1] = AIMessage(content=content)
     return state
 
-caller_tools = [book_appointment, get_next_available_appointment, cancel_appointment]
+caller_tools = [
+    book_appointment,
+    get_next_available_appointment,
+    get_optimal_appointment_slots,
+    get_wait_time_prediction,
+    get_busiest_times,
+    get_least_busy_times,
+    cancel_appointment
+]
 tool_node = ToolNode(caller_tools)
-logger.info(f"Tools initialized: {caller_tools}")
+logger.info(f"Tools initialized: {len(caller_tools)} ML-enhanced tools")
 
 # Graph
 caller_workflow = StateGraph(AgentState)

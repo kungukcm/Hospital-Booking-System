@@ -9,3 +9,8 @@ langchain-groq
 fastapi
 uvicorn
 python-dotenv
+tensorflow
+numpy
+pandas
+scikit-learn
+joblib
