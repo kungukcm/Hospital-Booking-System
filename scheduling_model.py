@@ -176,28 +176,43 @@ class SchedulingPredictor:
         """
         Generate mock predictions for testing (when model unavailable)
         In production, this will be replaced with actual model predictions
+        Deterministic: same inputs always produce same outputs
         """
         hour = appointment_datetime.hour
         day_of_week = appointment_datetime.weekday()
+        day_of_month = appointment_datetime.day
         
-        # Mock logic: busier during business hours and weekdays
-        base_wait = 20  # minutes
+        # Base wait time varies significantly by hour
+        base_wait = 15  # Start with baseline
         
-        # Peak hours: 9-12, 14-16
-        if 9 <= hour < 12 or 14 <= hour < 16:
-            base_wait += 30
-        elif 12 <= hour < 14:  # Lunch rush
-            base_wait += 25
-        elif hour < 9 or hour >= 17:  # Off-hours
-            base_wait -= 10
+        # Hour-based adjustments
+        if 9 <= hour < 10:  # 9-10 AM
+            base_wait = 8
+        elif 10 <= hour < 12:  # 10-12 AM - busy
+            base_wait = 20
+        elif 12 <= hour < 14:  # Lunch rush - very busy
+            base_wait = 45
+        elif 14 <= hour < 16:  # 2-4 PM - busy
+            base_wait = 25
+        elif 16 <= hour < 17:  # 4-5 PM - moderate
+            base_wait = 12
+        elif hour < 9 or hour >= 17:  # Before 9 AM or after 5 PM - quiet
+            base_wait = 5
         
-        # Weekday vs weekend
-        if day_of_week < 5:  # Weekday
-            base_wait += 15
-        else:  # Weekend
-            base_wait -= 10
+        # Day-of-week multiplier - VERY significant impact
+        day_multipliers = {
+            0: 1.8,  # Monday - busiest
+            1: 1.6,  # Tuesday
+            2: 1.4,  # Wednesday
+            3: 1.2,  # Thursday
+            4: 1.0,  # Friday - baseline
+            5: 0.6,  # Saturday - much quieter
+            6: 0.3   # Sunday - quietest
+        }
+        day_mult = day_multipliers.get(day_of_week, 1.0)
+        base_wait = base_wait * day_mult
         
-        # Add type-specific wait time
+        # Add type-specific wait time multiplier
         type_multipliers = {
             'consultation': 1.0,
             'checkup': 0.8,
@@ -208,11 +223,11 @@ class SchedulingPredictor:
         multiplier = type_multipliers.get(appointment_type.lower(), 1.0)
         base_wait *= multiplier
         
-        # Add some randomness
-        base_wait += np.random.normal(0, 5)
-        base_wait = max(5, min(240, base_wait))
+        # Clamp base_wait to reasonable range (3-240 minutes)
+        base_wait = max(3, min(240, base_wait))
         
-        confidence = 0.75 + np.random.uniform(-0.1, 0.1)
+        # Use fixed confidence score for deterministic results
+        confidence = 0.75
         
         return base_wait, confidence
     
