@@ -1,6 +1,6 @@
 """
-Enhanced Appointment Booking Tools with TCN Scheduling
-Integrates prescriptive scheduling for optimal appointment times
+Enhanced Appointment Booking Tools with TCN Scheduling + Intelligent Recommendations
+Integrates prescriptive scheduling, persistence, and batch processing
 """
 
 from langchain_core.tools import tool
@@ -8,258 +8,413 @@ import datetime
 import streamlit as st
 from logger import setup_logger
 from config import AppConfig
-from scheduling_model import SchedulingPredictor, get_predictor
+from appointments_db import add_appointment, cancel_appointment as db_cancel, get_appointments, check_conflict, get_appointment_stats, get_next_appointment as get_next_apt_db
+from appointment_recommender import get_recommender, CongestionCategory
 
 logger = setup_logger(__name__)
 config = AppConfig()
 
-# Initialize predictor
-predictor = None
-
-
-def init_predictor(model_path=None):
-    """Initialize the scheduling predictor"""
-    global predictor
-    if predictor is None:
-        # Use real model if available
-        model_path = model_path or "models/tcn_scheduling_model.h5"
-        predictor = SchedulingPredictor(model_path=model_path, framework="tensorflow")
-        logger.info(f"Scheduling predictor initialized with model: {model_path}")
-    return predictor
-
 
 @tool
-def book_appointment(person_name: str, appointment_type: str, appointment_year: int, appointment_month: int,
+def book_appointment(person_name: str, patient_id: str, phone_number: str, email_address: str, 
+                     appointment_type: str, appointment_year: int, appointment_month: int,
                      appointment_day: int, appointment_hour: int, appointment_minute: int):
     """
-    Book an appointment with the given details.
-    Uses ML model to provide waiting time predictions.
+    Book an appointment with AI-predicted waiting time.
+    Requires patient information: name, ID, phone, and email.
+    Checks for conflicts and stores in persistent database.
+    Returns confirmation with predicted wait time and congestion level.
     """
     logger.debug(f"Attempting to book appointment for {person_name}")
-    time = datetime.datetime(appointment_year, appointment_month, appointment_day, appointment_hour, appointment_minute)
     
-    # Initialize predictor if needed
-    init_predictor()
+    # Validate patient information
+    if not person_name or not person_name.strip():
+        return "❌ Error: Patient name is required."
+    if not patient_id or not patient_id.strip():
+        return "❌ Error: Patient ID is required."
+    if not phone_number or not phone_number.strip():
+        return "❌ Error: Phone number is required."
+    if not email_address or '@' not in email_address:
+        return "❌ Error: Valid email address is required."
     
-    # Predict waiting time for this slot
-    wait_time, confidence = predictor.predict_waiting_time(appointment_type, time)
-    
-    new_appointment = {
-        "name": person_name,
-        "type": appointment_type,
-        "time": time,
-        "predicted_wait_minutes": round(wait_time, 1),
-        "wait_confidence": round(confidence, 2)
-    }
-
-    if 'appointments' not in st.session_state:
-        logger.warning("appointments not in session state, initializing")
-        st.session_state.appointments = []
-
-    st.session_state.appointments.append(new_appointment)
-
-    logger.info(f"Booked appointment: {new_appointment}")
-    logger.debug(f"Current appointments: {st.session_state.appointments}")
-
-    return (f"✅ Appointment booked for {person_name} ({appointment_type}) on "
-            f"{time.strftime('%B %d, %Y at %I:%M %p')}. "
-            f"Predicted waiting time: {wait_time:.0f} minutes "
-            f"(confidence: {confidence*100:.0f}%). "
-            f"Is there anything else you need?")
-
-
-@tool
-def get_next_available_appointment():
-    """
-    Get the next available appointment slot with minimal predicted waiting time.
-    Uses ML model to recommend slots that minimize patient wait duration.
-    """
-    logger.debug("Checking for next available optimal appointment")
-    if 'appointments' not in st.session_state or not st.session_state.appointments:
-        logger.info("No appointments found")
-        return "All time slots are currently available. When would you like to schedule your appointment?"
-
-    current_time = datetime.datetime.now()
-    
-    # Initialize predictor
-    init_predictor()
-    
-    # Find next available slot
-    next_slot = current_time + datetime.timedelta(minutes=(30 - current_time.minute % 30))
-    
-    # Check for conflicts
-    while any(appointment["time"] == next_slot for appointment in st.session_state.appointments):
-        next_slot += datetime.timedelta(minutes=30)
-    
-    # Get predicted waiting time
-    appointment_type = st.session_state.appointments[-1]["type"] if st.session_state.appointments else "checkup"
-    wait_time, confidence = predictor.predict_waiting_time(appointment_type, next_slot)
-
-    logger.info(f"Next available slot: {next_slot} with {wait_time:.0f} min predicted wait")
-    
-    return (f"The next available slot is {next_slot.strftime('%B %d, %Y at %I:%M %p')}. "
-            f"Predicted waiting time: {wait_time:.0f} minutes. "
-            f"Would you like to book this time or see other options?")
+    try:
+        appointment_time = datetime.datetime(
+            appointment_year, appointment_month, appointment_day, 
+            appointment_hour, appointment_minute
+        )
+        
+        # Get recommender for prediction
+        recommender = get_recommender()
+        wait_time, confidence = recommender.predictor.predict_waiting_time(
+            appointment_type, appointment_time
+        )
+        
+        # Categorize congestion
+        congestion = CongestionCategory.categorize(wait_time)
+        
+        # Check for conflicts
+        conflict = check_conflict(appointment_time.isoformat(), duration_minutes=30)
+        conflict_warning = ""
+        if conflict:
+            conflict_warning = f" ⚠️ Note: Overlaps with {conflict['name']}'s appointment"
+        
+        # Create appointment record with patient details
+        appointment_record = {
+            "name": person_name.strip(),
+            "patient_id": patient_id.strip(),
+            "phone": phone_number.strip(),
+            "email": email_address.strip(),
+            "type": appointment_type,
+            "datetime": appointment_time.isoformat(),
+            "predicted_wait_minutes": round(wait_time, 1),
+            "confidence": round(confidence, 2),
+            "congestion_level": congestion['level'],
+            "duration_minutes": 30,
+            "status": "confirmed"
+        }
+        
+        # Save to database
+        saved_apt = add_appointment(appointment_record)
+        
+        # Format response
+        response = (
+            f"✅ **Appointment Booked!**\n\n"
+            f"**Patient:** {person_name}\n"
+            f"**Patient ID:** {patient_id}\n"
+            f"**Contact:** {phone_number} | {email_address}\n"
+            f"**Type:** {appointment_type}\n"
+            f"**Date/Time:** {appointment_time.strftime('%B %d, %Y at %I:%M %p')}\n"
+            f"**Appointment ID:** {saved_apt['id']}\n\n"
+            f"{congestion['emoji']} **Congestion Level:** {congestion['level']}\n"
+            f"⏱️ **Predicted Wait:** {wait_time:.0f} minutes\n"
+            f"📊 **Confidence:** {confidence*100:.0f}%\n"
+            f"{conflict_warning}"
+        )
+        
+        logger.info(f"✅ Booked: {saved_apt['id']} for {person_name} (ID: {patient_id})")
+        return response
+        
+    except ValueError as e:
+        return f"❌ Error: {str(e)}"
+    except Exception as e:
+        logger.error(f"Error booking appointment: {e}")
+        return f"❌ Error booking appointment: {str(e)}"
 
 
 @tool
 def get_optimal_appointment_slots(appointment_type: str, preferred_date: str, num_recommendations: int = 5):
     """
-    Get recommended appointment slots for a given date that minimize predicted waiting time.
-    Uses ML predictions to identify optimal booking times.
-    
-    Args:
-        appointment_type: Type of appointment (e.g., 'consultation', 'checkup')
-        preferred_date: Date in format YYYY-MM-DD
-        num_recommendations: Number of recommended slots to return
+    Get optimal appointment slots with lowest predicted waiting times.
+    Uses batch TCN predictions to identify least busy periods.
+    Returns color-coded recommendations (Green=Low, Yellow=Moderate, Red=High congestion).
     """
     logger.debug(f"Getting optimal slots for {appointment_type} on {preferred_date}")
     
     try:
-        # Parse date
-        date_obj = datetime.datetime.strptime(preferred_date, "%Y-%m-%d").date()
+        # Convert num_recommendations to int in case it comes as string from LLM
+        if isinstance(num_recommendations, str):
+            num_recommendations = int(num_recommendations)
         
-        # Initialize predictor
-        init_predictor()
+        # Parse date
+        date_obj = datetime.datetime.strptime(preferred_date, '%Y-%m-%d')
+        
+        # Get recommender
+        recommender = get_recommender()
         
         # Get optimal slots
-        optimal_slots = predictor.recommend_optimal_slots(
-            appointment_type, 
-            date_obj, 
-            num_recommendations=num_recommendations
+        slots, analytics = recommender.recommend_optimal_slots(
+            appointment_type, date_obj, num_recommendations
         )
         
-        if not optimal_slots:
-            return f"No available slots found for {preferred_date}. Please try another date."
+        # Build response
+        response = f"🎯 **Best Available Slots for {appointment_type}**\n"
+        response += f"📅 **{preferred_date}**\n\n"
         
-        # Format response
-        response = f"🎯 Optimal appointment times for {appointment_type.title()} on {preferred_date}:\n\n"
-        for slot in optimal_slots:
-            response += (f"{slot['rank']}. {slot['time']} - "
-                        f"Predicted wait: {slot['predicted_wait_minutes']:.0f} min "
-                        f"(confidence: {slot['confidence']*100:.0f}%)\n")
+        for i, slot in enumerate(slots, 1):
+            response += (
+                f"{i}. {slot['congestion_emoji']} **{slot['time']}**\n"
+                f"   {slot['congestion_color']} {slot['congestion_level']} congestion\n"
+                f"   ⏱️ Est. wait: {slot['predicted_wait_minutes']:.0f} min "
+                f"(confidence: {slot['confidence']*100:.0f}%)\n\n"
+            )
         
-        response += "\nThese times are ranked by lowest predicted waiting time. "
-        response += "Which time would you prefer?"
+        # Add analytics
+        response += f"📊 **Daily Analytics:**\n"
+        response += f"• Available low-congestion slots: {analytics['low_congestion_slots']}/{analytics['total_slots']}\n"
+        response += f"• Average wait time: {analytics['avg_wait_time']} min\n"
+        response += f"• Availability score: {analytics['availability_score']}%\n"
         
-        logger.info(f"Recommended {len(optimal_slots)} optimal slots")
         return response
         
-    except ValueError:
-        logger.error(f"Invalid date format: {preferred_date}")
-        return (f"Please provide the date in YYYY-MM-DD format. "
-                f"For example, 2026-01-20 for January 20, 2026.")
+    except Exception as e:
+        logger.error(f"Error getting optimal slots: {e}")
+        return f"❌ Error: {str(e)}"
 
 
 @tool
-def cancel_appointment(year: int, month: int, day: int, hour: int, minute: int):
+def suggest_alternative_slots(appointment_type: str, preferred_date: str, preferred_time: str, num_alternatives: int = 3):
     """
-    Cancel an appointment at the specified time.
+    If user's preferred slot is congested, suggest better alternatives.
+    Analyzes congestion level and recommends less busy times with lower predicted waits.
     """
-    logger.debug(f"Attempting to cancel appointment at {year}-{month}-{day} {hour}:{minute}")
-    
-    cancel_time = datetime.datetime(year, month, day, hour, minute)
-    
-    if 'appointments' not in st.session_state:
-        return "No appointments to cancel."
-
-    initial_count = len(st.session_state.appointments)
-    st.session_state.appointments = [
-        app for app in st.session_state.appointments 
-        if app["time"] != cancel_time
-    ]
-
-    if len(st.session_state.appointments) < initial_count:
-        logger.info(f"Cancelled appointment at {cancel_time}")
-        return f"Appointment on {cancel_time.strftime('%B %d, %Y at %I:%M %p')} has been cancelled."
-    else:
-        logger.warning(f"No appointment found at {cancel_time}")
-        return f"No appointment found at {cancel_time.strftime('%B %d, %Y at %I:%M %p')}."
-
-
-@tool
-def get_wait_time_prediction(appointment_type: str, appointment_year: int, appointment_month: int,
-                            appointment_day: int, appointment_hour: int, appointment_minute: int):
-    """
-    Get predicted waiting time for a specific appointment without booking.
-    Helps patients understand expected wait times for different time slots.
-    """
-    logger.debug(f"Getting wait time prediction for {appointment_type}")
-    
-    appointment_time = datetime.datetime(
-        appointment_year, appointment_month, appointment_day, 
-        appointment_hour, appointment_minute
-    )
-    
-    # Initialize predictor
-    init_predictor()
-    
-    wait_time, confidence = predictor.predict_waiting_time(appointment_type, appointment_time)
-    
-    return (f"For a {appointment_type} appointment on "
-            f"{appointment_time.strftime('%B %d, %Y at %I:%M %p')}, "
-            f"the predicted waiting time is {wait_time:.0f} minutes "
-            f"(confidence: {confidence*100:.0f}%). "
-            f"Would you like to book at this time or see other options?")
-
-
-@tool
-def get_busiest_times(appointment_type: str, date_str: str):
-    """
-    Get the busiest appointment times for a given date.
-    Helps patients understand when to avoid for shorter waits.
-    
-    Args:
-        appointment_type: Type of appointment
-        date_str: Date in format YYYY-MM-DD
-    """
-    logger.debug(f"Getting busiest times for {appointment_type} on {date_str}")
+    logger.debug(f"Suggesting alternatives for {appointment_type} at {preferred_time}")
     
     try:
-        date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        # Parse datetime
+        preferred_datetime = datetime.datetime.strptime(
+            f"{preferred_date} {preferred_time}", '%Y-%m-%d %H:%M'
+        )
         
-        # Initialize predictor
-        init_predictor()
+        # Get recommender
+        recommender = get_recommender()
         
-        busiest = predictor.get_busiest_times(appointment_type, date_obj)
+        # Suggest alternatives
+        result = recommender.suggest_alternatives(
+            appointment_type, preferred_datetime, num_alternatives
+        )
         
-        response = f"⏰ Busiest times for {appointment_type.title()} on {date_str}:\n\n"
-        for time_str in busiest:
-            response += f"• {time_str}\n"
+        # Build response
+        response = f"🔍 **Appointment Availability Analysis**\n\n"
+        response += f"**Your Preferred Time:** {result['preferred']['time']}\n"
+        response += (
+            f"{result['preferred']['congestion_emoji']} "
+            f"Congestion: {result['preferred']['congestion_level']}\n"
+            f"⏱️ Predicted wait: {result['preferred']['predicted_wait_minutes']:.0f} min\n\n"
+        )
         
-        response += "\nConsider booking earlier or later in the day for shorter waits."
+        if result['recommendation'] == 'ACCEPT':
+            response += "✅ **Great choice!** This time has low congestion.\n"
+        
+        elif result['recommendation'] == 'SUGGEST_ALTERNATIVE':
+            response += f"⚠️ **We have better options:**\n\n"
+            for i, alt in enumerate(result['alternatives'], 1):
+                response += (
+                    f"{i}. {alt['congestion_emoji']} **{alt['time']}** - "
+                    f"{alt['congestion_color']} {alt['congestion_level']}\n"
+                    f"   ⏱️ Wait: {alt['predicted_wait_minutes']:.0f} min "
+                    f"(save {result['preferred']['predicted_wait_minutes'] - alt['predicted_wait_minutes']:.0f} min)\n\n"
+                )
+            response += f"💡 {result['message']}\n"
+        
+        else:
+            response += f"ℹ️ {result['message']}\n"
+        
         return response
         
-    except ValueError:
-        return "Please provide the date in YYYY-MM-DD format (e.g., 2026-01-20)."
+    except Exception as e:
+        logger.error(f"Error suggesting alternatives: {e}")
+        return f"❌ Error: {str(e)}"
 
 
 @tool
-def get_least_busy_times(appointment_type: str, date_str: str):
+def get_wait_time_prediction(appointment_type: str, appointment_date: str, appointment_time: str):
     """
-    Get the least busy appointment times for a given date.
-    These times typically have minimal predicted waiting periods.
-    
-    Args:
-        appointment_type: Type of appointment
-        date_str: Date in format YYYY-MM-DD
+    Get waiting time prediction for a specific appointment slot.
+    Includes confidence score and congestion categorization.
     """
-    logger.debug(f"Getting least busy times for {appointment_type} on {date_str}")
+    logger.debug(f"Predicting wait for {appointment_type} at {appointment_time}")
     
     try:
-        date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        appointment_datetime = datetime.datetime.strptime(
+            f"{appointment_date} {appointment_time}", '%Y-%m-%d %H:%M'
+        )
         
-        # Initialize predictor
-        init_predictor()
+        recommender = get_recommender()
+        wait_time, confidence = recommender.predictor.predict_waiting_time(
+            appointment_type, appointment_datetime
+        )
         
-        least_busy = predictor.get_least_busy_times(appointment_type, date_obj)
+        congestion = CongestionCategory.categorize(wait_time)
         
-        response = f"✨ Best times for {appointment_type.title()} on {date_str}:\n\n"
-        for recommendation in least_busy:
-            response += f"• {recommendation}\n"
+        response = (
+            f"⏱️ **Wait Time Prediction**\n\n"
+            f"**Appointment:** {appointment_type} at {appointment_time}\n"
+            f"**Predicted Wait:** {wait_time:.0f} minutes\n"
+            f"{congestion['emoji']} **Congestion:** {congestion['level']}\n"
+            f"📊 **Confidence:** {confidence*100:.0f}%\n"
+        )
         
-        response += "\nThese times are predicted to have minimal waiting periods."
         return response
         
-    except ValueError:
-        return "Please provide the date in YYYY-MM-DD format (e.g., 2026-01-20)."
+    except Exception as e:
+        logger.error(f"Error predicting wait time: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+@tool
+def get_least_busy_times(appointment_type: str, preferred_date: str):
+    """
+    Get the least busy appointment times for a given day.
+    Returns slots with lowest predicted waiting times.
+    """
+    logger.debug(f"Getting least busy times for {appointment_type}")
+    
+    try:
+        date_obj = datetime.datetime.strptime(preferred_date, '%Y-%m-%d')
+        recommender = get_recommender()
+        
+        slots = recommender.get_least_busy_slots(appointment_type, date_obj, num_slots=5)
+        
+        response = f"🟢 **Least Busy Times for {appointment_type}**\n"
+        response += f"📅 **{preferred_date}**\n\n"
+        
+        for i, slot in enumerate(slots, 1):
+            response += (
+                f"{i}. {slot['congestion_emoji']} **{slot['time']}** - "
+                f"⏱️ {slot['predicted_wait_minutes']:.0f} min wait\n"
+            )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error getting least busy times: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+@tool
+def get_busiest_times(appointment_type: str, preferred_date: str):
+    """
+    Get the busiest appointment times for a given day (times to avoid).
+    Returns slots with highest predicted waiting times.
+    """
+    logger.debug(f"Getting busiest times for {appointment_type}")
+    
+    try:
+        date_obj = datetime.datetime.strptime(preferred_date, '%Y-%m-%d')
+        recommender = get_recommender()
+        
+        slots = recommender.get_busiest_slots(appointment_type, date_obj, num_slots=5)
+        
+        response = f"🔴 **Busiest Times to Avoid**\n"
+        response += f"📅 **{preferred_date}**\n\n"
+        
+        for i, slot in enumerate(slots, 1):
+            response += (
+                f"{i}. {slot['congestion_emoji']} **{slot['time']}** - "
+                f"⏱️ {slot['predicted_wait_minutes']:.0f} min wait (avoid!)\n"
+            )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error getting busiest times: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+@tool
+def cancel_appointment(appointment_id: str = None, person_name: str = None, reason: str = "Patient request"):
+    """
+    Cancel an appointment by ID or patient name.
+    Updates status in persistent database and records cancellation reason.
+    """
+    logger.debug(f"Attempting to cancel appointment: {appointment_id or person_name}")
+    
+    try:
+        # Find appointment to cancel
+        apt_to_cancel = None
+        
+        if appointment_id:
+            appointments = get_appointments()
+            apt_to_cancel = next((a for a in appointments if a['id'] == appointment_id), None)
+        
+        elif person_name:
+            appointments = get_appointments(filter_by_status='confirmed')
+            matching = [a for a in appointments if a['name'].lower() == person_name.lower()]
+            if matching:
+                apt_to_cancel = matching[0]
+        
+        if not apt_to_cancel:
+            return f"❌ Appointment not found"
+        
+        # Cancel it
+        success = db_cancel(apt_to_cancel['id'], reason)
+        
+        if success:
+            response = (
+                f"✅ **Appointment Cancelled**\n\n"
+                f"**Patient:** {apt_to_cancel['name']}\n"
+                f"**ID:** {apt_to_cancel['id']}\n"
+                f"**Type:** {apt_to_cancel['type']}\n"
+                f"**Original Time:** {apt_to_cancel.get('datetime', 'N/A')}\n"
+                f"**Reason:** {reason}"
+            )
+            logger.info(f"✅ Cancelled: {apt_to_cancel['id']}")
+            return response
+        
+        return "❌ Failed to cancel appointment"
+        
+    except Exception as e:
+        logger.error(f"Error cancelling appointment: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+@tool
+def get_next_available_appointment():
+    """
+    Get the next scheduled appointment in the system.
+    Shows details with predicted waiting time.
+    """
+    logger.debug("Getting next available appointment")
+    
+    try:
+        apt = get_next_apt_db()
+        
+        if not apt:
+            return "📅 No upcoming appointments scheduled."
+        
+        response = (
+            f"📅 **Next Appointment**\n\n"
+            f"**Patient:** {apt['name']}\n"
+            f"**Type:** {apt['type']}\n"
+            f"**ID:** {apt['id']}\n"
+            f"**Scheduled:** {apt['datetime']}\n"
+            f"⏱️ **Predicted Wait:** {apt.get('predicted_wait_minutes', 'N/A')} min\n"
+            f"**Status:** {apt['status']}"
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error getting next appointment: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+@tool
+def view_all_appointments():
+    """
+    View all confirmed appointments with details.
+    Displays statistics including total appointments, types, and average wait.
+    """
+    logger.debug("Viewing all appointments")
+    
+    try:
+        appointments = get_appointments(filter_by_status='confirmed')
+        stats = get_appointment_stats()
+        
+        if not appointments:
+            return "📅 No appointments scheduled."
+        
+        response = f"📊 **Appointment Summary**\n\n"
+        response += f"**Total Appointments:** {stats['total']}\n"
+        response += f"**Upcoming:** {stats['upcoming_count']}\n"
+        response += f"**Average Wait Time:** {stats['average_wait_time']} min\n\n"
+        
+        response += "**Appointments by Type:**\n"
+        for apt_type, count in stats['by_type'].items():
+            response += f"• {apt_type}: {count}\n"
+        
+        response += f"\n**All Appointments:**\n"
+        for apt in appointments[:10]:  # Show first 10
+            response += (
+                f"• {apt['name']} - {apt['type']} "
+                f"({apt['datetime']}) - Wait: {apt.get('predicted_wait_minutes', 'N/A')} min\n"
+            )
+        
+        if len(appointments) > 10:
+            response += f"... and {len(appointments) - 10} more\n"
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error viewing appointments: {e}")
+        return f"❌ Error: {str(e)}"
