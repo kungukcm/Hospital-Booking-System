@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: kutrrh-assistant-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend_api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    disk:
+      name: kutrrh-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        generateValue: true

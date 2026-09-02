@@ -16,7 +16,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Backend API configuration
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
+try:
+    BACKEND_URL = st.secrets.get("BACKEND_URL", BACKEND_URL).rstrip("/")
+except Exception:
+    pass
 LOGO_PATH = os.path.join(os.path.dirname(__file__), ".streamlit", "kutrrh_logo.png")
 
 # Page configuration

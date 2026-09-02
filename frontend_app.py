@@ -16,7 +16,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Backend API configuration
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
+try:
+    BACKEND_URL = st.secrets.get("BACKEND_URL", BACKEND_URL).rstrip("/")
+except Exception:
+    pass
 
 # KUTRRH Branding & Colors
 KUTRRH_COLORS = {
