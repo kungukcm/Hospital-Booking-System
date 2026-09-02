@@ -21,6 +21,8 @@ try:
     BACKEND_URL = st.secrets.get("BACKEND_URL", BACKEND_URL).rstrip("/")
 except Exception:
     pass
+if BACKEND_URL in {"https://example.onrender.com", "https://YOUR-RENDER-SERVICE.onrender.com"}:
+    BACKEND_URL = "http://localhost:8000"
 LOGO_PATH = os.path.join(os.path.dirname(__file__), ".streamlit", "kutrrh_logo.png")
 
 # Page configuration

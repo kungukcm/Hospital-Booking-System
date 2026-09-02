@@ -21,6 +21,8 @@ try:
     BACKEND_URL = st.secrets.get("BACKEND_URL", BACKEND_URL).rstrip("/")
 except Exception:
     pass
+if BACKEND_URL in {"https://example.onrender.com", "https://YOUR-RENDER-SERVICE.onrender.com"}:
+    BACKEND_URL = "http://localhost:8000"
 
 # KUTRRH Branding & Colors
 KUTRRH_COLORS = {

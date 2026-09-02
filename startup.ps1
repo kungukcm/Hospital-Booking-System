@@ -8,8 +8,10 @@ Write-Host ""
 # Activate virtual environment
 if (Test-Path ".\venv\Scripts\Activate.ps1") {
     & ".\venv\Scripts\Activate.ps1"
+    $PythonExe = (Resolve-Path ".\venv\Scripts\python.exe").Path
 } elseif (Test-Path ".\.venv\Scripts\Activate.ps1") {
     & ".\.venv\Scripts\Activate.ps1"
+    $PythonExe = (Resolve-Path ".\.venv\Scripts\python.exe").Path
 } else {
     Write-Host "❌ Virtual environment not found. Please create one first." -ForegroundColor Red
     exit 1
@@ -28,9 +30,9 @@ function Start-ServiceProcess {
     
     # Start process in new window
     if ($Name -eq "Backend API") {
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "python backend_api.py"
+        Start-Process -FilePath $PythonExe -ArgumentList "backend_api.py" -WorkingDirectory (Get-Location)
     } else {
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "streamlit run $Command --logger.level=info --client.showErrorDetails=false"
+        Start-Process -FilePath $PythonExe -ArgumentList "-m streamlit run $Command --logger.level=info --client.showErrorDetails=false" -WorkingDirectory (Get-Location)
     }
     
     Start-Sleep -Seconds 2
@@ -42,7 +44,7 @@ Start-ServiceProcess -Name "Public Frontend" -Command "frontend_app.py" -Port "8
 
 # For admin dashboard, need to pass different port
 Write-Host "🚀 Starting Admin Dashboard on port 8502..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "streamlit run admin_dashboard.py --logger.level=info --server.port 8502 --client.showErrorDetails=false"
+Start-Process -FilePath $PythonExe -ArgumentList "-m streamlit run admin_dashboard.py --logger.level=info --server.port 8502 --client.showErrorDetails=false" -WorkingDirectory (Get-Location)
 
 Start-Sleep -Seconds 2
 
