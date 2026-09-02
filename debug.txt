@@ -1,0 +1,41 @@
+2026-01-20 23:49:38.992316: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-01-20 23:49:40.861980: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING:tensorflow:From C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\tf_keras\src\losses.py:2976: The name tf.losses.sparse_softmax_cross_entropy is deprecated. Please use tf.compat.v1.losses.sparse_softmax_cross_entropy instead.
+
+Loading vector store...
+
+Original query: 'What are the payment methods?'
+Expanded to: 7 queries
+
+Retrieving documents...
+
+Retrieved 28 unique documents
+
+Top 10 results:
+======================================================================
+1. Score: 0.9371 | Kenya-Digital-Economy-2019.pdf
+   Query: 'What are the payment methods?'
+   Content: transaction ii. Pervasive, reliable communications: reliable networks, hardware and connectivity bet...
+
+2. Score: 0.9720 | KUTTRH-Service-Charter.pdf *** SERVICE CHARTER ***
+   Query: 'hospital deposit Ksh payment'
+   Content: ò Service Request Form General Ward patients- Ksh. 700 Within 10 minutes iii. Speech therapy ò Refer...
+
+3. Score: 1.0153 | Hospital profile_251230_205707.pdf
+   Query: 'NHIF insurance deposit admission'
+   Content: of universal health coverage but also demonstrating its commitment to providing quality and affordab...
+
+4. Score: 1.0334 | Digital-Health-Bill-Final.pdf
+   Query: 'All payments shall be made through'
+   Content: (c) PART IIIùFINANCIAL PROVISIONS Funds of the Agency. (d) 15. (1) The funds of the A gency shall co...
+
+5. Score: 1.0350 | Kenya-Digital-Economy-2019.pdf
+   Query: 'What are the payment methods?'
+Traceback (most recent call last):
+  File "C:\Users\ckmat\OneDrive\Documents\Masters ICT Policy\Thesis\Thesis Project\AI Assistant\debug_search.py", line 74, in <module>
+    print(f"   Content: {content[:100]}...\n")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\x83' in position 32: character maps to <undefined>

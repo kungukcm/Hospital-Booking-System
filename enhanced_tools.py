@@ -102,18 +102,16 @@ def book_appointment(person_name: str, patient_id: str, phone_number: str, email
 
 
 @tool
-def get_optimal_appointment_slots(appointment_type: str, preferred_date: str, num_recommendations: int = 5):
+def get_optimal_appointment_slots(appointment_type: str, preferred_date: str):
     """
     Get optimal appointment slots with lowest predicted waiting times.
     Uses batch TCN predictions to identify least busy periods.
     Returns color-coded recommendations (Green=Low, Yellow=Moderate, Red=High congestion).
     """
+    num_recommendations = 5
     logger.debug(f"Getting optimal slots for {appointment_type} on {preferred_date}")
     
     try:
-        # Convert num_recommendations to int in case it comes as string from LLM
-        if isinstance(num_recommendations, str):
-            num_recommendations = int(num_recommendations)
         
         # Parse date
         date_obj = datetime.datetime.strptime(preferred_date, '%Y-%m-%d')
@@ -302,11 +300,13 @@ def get_busiest_times(appointment_type: str, preferred_date: str):
 
 
 @tool
-def cancel_appointment(appointment_id: str = None, person_name: str = None, reason: str = "Patient request"):
+def cancel_appointment(appointment_id: str, person_name: str):
     """
-    Cancel an appointment by ID or patient name.
-    Updates status in persistent database and records cancellation reason.
-    """
+    Cancel an appointment by providing either the appointment ID or the patient name.
+    Pass the appointment_id if known, otherwise pass the person_name.
+    Pass an empty string for the parameter you do not have.
+    """  
+    reason = "Patient request"
     logger.debug(f"Attempting to cancel appointment: {appointment_id or person_name}")
     
     try:

@@ -1,0 +1,64 @@
+# MERGED MANUSCRIPT ASSEMBLY OUTLINE
+
+## Purpose
+
+This file provides the exact assembly order if you want to merge all thesis manuscript sections into a single master document.
+
+## Recommended Order
+
+1. 00_FRONT_MATTER.md
+2. 01_CHAPTER_ONE_INTRODUCTION.md
+3. 17_CHAPTER_ONE_EXTENDED_CONTEXT_AND_POLICY.md
+4. 25_CHAPTER_ONE_FULL_EXPANSION.md
+5. 02_CHAPTER_TWO_LITERATURE_REVIEW.md
+6. 09_DETAILED_LITERATURE_SYNTHESIS.md
+7. 14_CHAPTER_TWO_SOURCE_BY_SOURCE_SYNTHESIS.md
+8. 21_COMPARATIVE_LITERATURE_TABLES_AND_THEORY.md
+9. 26_CHAPTER_TWO_TRUST_GOVERNANCE_AND_ADOPTION.md
+10. 29_CHAPTER_TWO_SERVICE_ECONOMICS_AND_OPERATIONAL_IMPACT.md
+11. 03_CHAPTER_THREE_METHODOLOGY.md
+12. 10_EXTENDED_METHODOLOGY_INSTRUMENTS.md
+13. 18_CHAPTER_THREE_FIELD_PILOT_DESIGN_AND_OPERATIONAL_METHODS.md
+14. 30_CHAPTER_THREE_ETHICS_AND_RESEARCH_INTEGRITY.md
+15. 04_CHAPTER_FOUR_SYSTEM_DESIGN.md
+16. 15_CHAPTER_FOUR_TECHNICAL_DEEP_DIVE.md
+17. 27_CHAPTER_FOUR_DEPLOYMENT_STRATEGY_AND_ARCHITECTURE.md
+18. 33_CHAPTER_FOUR_IMPLEMENTATION_TROUBLESHOOTING_AND_VALIDATION.md
+19. 05_CHAPTER_FIVE_RESULTS.md
+20. 11_EXTENDED_RESULTS_AND_TRANSCRIPTS.md
+21. 16_CHAPTER_FIVE_QUANT_EVAL_PLAN_AND_TABLES.md
+22. 19_CHAPTER_FIVE_EXTENDED_INTERPRETATION_AND_IMPACT_ANALYSIS.md
+23. 31_EXTENDED_CASE_TRANSCRIPTS_AND_ANALYTICAL_VIGNETTES.md
+24. 34_CHAPTER_FIVE_USER_EXPERIENCE_AND_HUMAN_FACTORS.md
+25. 06_CHAPTER_SIX_DISCUSSION.md
+26. 12_POLICY_GOVERNANCE_AND_IMPLEMENTATION_ROADMAP.md
+27. 20_CHAPTER_SIX_STRATEGIC_RECOMMENDATIONS_AND_SCALING_MODEL.md
+28. 32_CHAPTER_SIX_DIGITAL_HEALTH_TRANSFORMATION_AND_NATIONAL_SCALE.md
+29. 07_CHAPTER_SEVEN_CONCLUSION.md
+30. 22_LIMITATIONS_RISK_REGISTER_AND_FUTURE_RESEARCH.md
+31. 08_REFERENCES_AND_APPENDICES.md
+32. 13_APA7_REFERENCE_DRAFT_FROM_SOURCE_FILES.md
+33. 23_REFINED_APA7_REFERENCE_MATRIX.md
+34. 28_REFERENCE_VERIFICATION_AND_FOOTNOTE_GUIDE.md
+35. 24_APPENDIX_IMPLEMENTATION_CHECKLIST.md
+
+## How to Merge
+
+1. Open a blank Word document.
+2. Paste or insert each file in the order above.
+3. Remove duplicated chapter headings if your final Word formatting already provides them.
+4. Replace placeholder names and verify references.
+5. Apply the thesis template margins, page numbers, and heading styles.
+
+## Notes
+
+1. The supplements are intentionally verbose to support a full thesis-length manuscript.
+2. If page count still falls short after Word formatting, expand Chapter 2 and Chapter 5 first.
+3. Keep the front matter aligned with the institutional format file.
+
+## Final Verification Steps
+
+1. Confirm all chapters appear once and only once.
+2. Confirm all references are alphabetized and APA-compliant.
+3. Confirm page numbering matches template expectations.
+4. Confirm the final PDF has the expected structure and formatting.

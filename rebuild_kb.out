@@ -1,0 +1,114 @@
+2026-01-20 15:40:52.881518: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-01-20 15:40:55.575638: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING:tensorflow:From C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\tf_keras\src\losses.py:2976: The name tf.losses.sparse_softmax_cross_entropy is deprecated. Please use tf.compat.v1.losses.sparse_softmax_cross_entropy instead.
+
+USER_AGENT environment variable not set, consider setting it to identify your requests.
+Rebuilding hospital knowledge base...
+2026-01-20 15:41:03,642 - hospital_setup - INFO - Setting up hospital knowledge base...
+2026-01-20 15:41:03,643 - hospital_setup - INFO - Found PDF: 15COMBINED The Digital Health Act, 2023.pdf
+2026-01-20 15:41:03,643 - hospital_setup - INFO - Found PDF: Automated process ICTI_2024_25.pdf
+2026-01-20 15:41:03,643 - hospital_setup - INFO - Found PDF: computer-misuse-and-cybercrimes-act.pdf
+2026-01-20 15:41:03,643 - hospital_setup - INFO - Found PDF: Digital-Health-Bill-Final.pdf
+2026-01-20 15:41:03,643 - hospital_setup - INFO - Found PDF: Facilities-Improvement-Financing-Bill-Final.pdf
+2026-01-20 15:41:03,643 - hospital_setup - INFO - Found PDF: Frequently Asked Questions FAQs.pdf
+2026-01-20 15:41:03,643 - hospital_setup - INFO - Found PDF: Health Sector ICT Standards and Guidelines.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: Hospital profile_251230_205707.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: Kenya-Digital-Economy-2019.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: KENYA-NATIONAL-eHEALTH-POLICY-2016-2030.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: Kutrrh_ict_policy.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: KUTTRH-Service-Charter.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: NATIONAL-ICT-POLICY-2019.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: National-ICT-Policy-Guidelines-2020.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: Primary-Healthcare-Bill-Final.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: Quality_Policy_Verion_2.0-01.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: Social-Health-Insurance-Bill-Final - Copy.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: Social-Health-Insurance-Bill-Final.pdf
+2026-01-20 15:41:03,644 - hospital_setup - INFO - Found PDF: TARIFFS TO THE BENEFIT PACKAGE TO THE SHIF.pdf
+2026-01-20 15:41:03,645 - hospital_setup - INFO - Found PDF: TheDataProtectionAct__No24of2019.pdf
+2026-01-20 15:41:03,645 - hospital_setup - INFO - Found PDF: WHO Global Digital Health Strategy 2020-2025.pdf
+2026-01-20 15:41:03,645 - hospital_setup - INFO - Initializing with 21 PDFs and 4 website URLs
+C:\Users\ckmat\OneDrive\Documents\Masters ICT Policy\Thesis\Thesis Project\AI Assistant\hospital_retriever.py:39: LangChainDeprecationWarning: The class `HuggingFaceEmbeddings` was deprecated in LangChain 0.2.2 and will be removed in 1.0. An updated version of the class exists in the `langchain-huggingface package and should be used instead. To use it run `pip install -U `langchain-huggingface` and import as `from `langchain_huggingface import HuggingFaceEmbeddings``.
+  self.embeddings = HuggingFaceEmbeddings(
+2026-01-20 15:41:07,311 - hospital_retriever - INFO - Initialized retriever with embedding model: all-MiniLM-L6-v2
+2026-01-20 15:41:07,312 - hospital_retriever - INFO - Loading PDF: hospital_docs\15COMBINED The Digital Health Act, 2023.pdf
+Ignoring wrong pointing object 8 0 (offset 0)
+Ignoring wrong pointing object 12 0 (offset 0)
+Ignoring wrong pointing object 43 0 (offset 0)
+Ignoring wrong pointing object 52 0 (offset 0)
+Ignoring wrong pointing object 54 0 (offset 0)
+Ignoring wrong pointing object 61 0 (offset 0)
+Ignoring wrong pointing object 63 0 (offset 0)
+Ignoring wrong pointing object 66 0 (offset 0)
+Ignoring wrong pointing object 122 0 (offset 0)
+Ignoring wrong pointing object 206 0 (offset 0)
+2026-01-20 15:41:08,702 - hospital_retriever - INFO - Loaded 39 pages from hospital_docs\15COMBINED The Digital Health Act, 2023.pdf
+2026-01-20 15:41:08,702 - hospital_retriever - INFO - Loading PDF: hospital_docs\Automated process ICTI_2024_25.pdf
+2026-01-20 15:41:08,899 - hospital_retriever - INFO - Loaded 5 pages from hospital_docs\Automated process ICTI_2024_25.pdf
+2026-01-20 15:41:08,900 - hospital_retriever - INFO - Loading PDF: hospital_docs\computer-misuse-and-cybercrimes-act.pdf
+Ignoring wrong pointing object 18 0 (offset 0)
+Ignoring wrong pointing object 270 0 (offset 0)
+2026-01-20 15:41:11,513 - hospital_retriever - INFO - Loaded 64 pages from hospital_docs\computer-misuse-and-cybercrimes-act.pdf
+2026-01-20 15:41:11,513 - hospital_retriever - INFO - Loading PDF: hospital_docs\Digital-Health-Bill-Final.pdf
+2026-01-20 15:41:12,608 - hospital_retriever - INFO - Loaded 43 pages from hospital_docs\Digital-Health-Bill-Final.pdf
+2026-01-20 15:41:12,609 - hospital_retriever - INFO - Loading PDF: hospital_docs\Facilities-Improvement-Financing-Bill-Final.pdf
+2026-01-20 15:41:13,049 - hospital_retriever - INFO - Loaded 19 pages from hospital_docs\Facilities-Improvement-Financing-Bill-Final.pdf
+2026-01-20 15:41:13,049 - hospital_retriever - INFO - Loading PDF: hospital_docs\Frequently Asked Questions FAQs.pdf
+2026-01-20 15:41:13,185 - hospital_retriever - INFO - Loaded 5 pages from hospital_docs\Frequently Asked Questions FAQs.pdf
+2026-01-20 15:41:13,185 - hospital_retriever - INFO - Loading PDF: hospital_docs\Health Sector ICT Standards and Guidelines.pdf
+2026-01-20 15:41:13,607 - hospital_retriever - INFO - Loaded 17 pages from hospital_docs\Health Sector ICT Standards and Guidelines.pdf
+2026-01-20 15:41:13,608 - hospital_retriever - INFO - Loading PDF: hospital_docs\Hospital profile_251230_205707.pdf
+2026-01-20 15:41:15,402 - hospital_retriever - INFO - Loaded 64 pages from hospital_docs\Hospital profile_251230_205707.pdf
+2026-01-20 15:41:15,402 - hospital_retriever - INFO - Loading PDF: hospital_docs\Kenya-Digital-Economy-2019.pdf
+2026-01-20 15:41:24,341 - hospital_retriever - INFO - Loaded 96 pages from hospital_docs\Kenya-Digital-Economy-2019.pdf
+2026-01-20 15:41:24,341 - hospital_retriever - INFO - Loading PDF: hospital_docs\KENYA-NATIONAL-eHEALTH-POLICY-2016-2030.pdf
+2026-01-20 15:41:25,647 - hospital_retriever - INFO - Loaded 64 pages from hospital_docs\KENYA-NATIONAL-eHEALTH-POLICY-2016-2030.pdf
+2026-01-20 15:41:25,647 - hospital_retriever - INFO - Loading PDF: hospital_docs\Kutrrh_ict_policy.pdf
+2026-01-20 15:41:26,085 - hospital_retriever - INFO - Loaded 41 pages from hospital_docs\Kutrrh_ict_policy.pdf
+2026-01-20 15:41:26,085 - hospital_retriever - INFO - Loading PDF: hospital_docs\KUTTRH-Service-Charter.pdf
+2026-01-20 15:41:27,179 - hospital_retriever - INFO - Loaded 2 pages from hospital_docs\KUTTRH-Service-Charter.pdf
+2026-01-20 15:41:27,180 - hospital_retriever - INFO - Loading PDF: hospital_docs\NATIONAL-ICT-POLICY-2019.pdf
+2026-01-20 15:41:29,468 - hospital_retriever - INFO - Loaded 37 pages from hospital_docs\NATIONAL-ICT-POLICY-2019.pdf
+2026-01-20 15:41:29,469 - hospital_retriever - INFO - Loading PDF: hospital_docs\National-ICT-Policy-Guidelines-2020.pdf
+2026-01-20 15:41:29,486 - hospital_retriever - INFO - Loaded 18 pages from hospital_docs\National-ICT-Policy-Guidelines-2020.pdf
+2026-01-20 15:41:29,486 - hospital_retriever - INFO - Loading PDF: hospital_docs\Primary-Healthcare-Bill-Final.pdf
+2026-01-20 15:41:30,150 - hospital_retriever - INFO - Loaded 27 pages from hospital_docs\Primary-Healthcare-Bill-Final.pdf
+2026-01-20 15:41:30,150 - hospital_retriever - INFO - Loading PDF: hospital_docs\Quality_Policy_Verion_2.0-01.pdf
+2026-01-20 15:41:30,152 - hospital_retriever - INFO - Loaded 1 pages from hospital_docs\Quality_Policy_Verion_2.0-01.pdf
+2026-01-20 15:41:30,152 - hospital_retriever - INFO - Loading PDF: hospital_docs\Social-Health-Insurance-Bill-Final - Copy.pdf
+2026-01-20 15:41:31,830 - hospital_retriever - INFO - Loaded 37 pages from hospital_docs\Social-Health-Insurance-Bill-Final - Copy.pdf
+2026-01-20 15:41:31,830 - hospital_retriever - INFO - Loading PDF: hospital_docs\Social-Health-Insurance-Bill-Final.pdf
+2026-01-20 15:41:33,156 - hospital_retriever - INFO - Loaded 37 pages from hospital_docs\Social-Health-Insurance-Bill-Final.pdf
+2026-01-20 15:41:33,157 - hospital_retriever - INFO - Loading PDF: hospital_docs\TARIFFS TO THE BENEFIT PACKAGE TO THE SHIF.pdf
+2026-01-20 15:41:35,325 - hospital_retriever - INFO - Loaded 54 pages from hospital_docs\TARIFFS TO THE BENEFIT PACKAGE TO THE SHIF.pdf
+2026-01-20 15:41:35,325 - hospital_retriever - INFO - Loading PDF: hospital_docs\TheDataProtectionAct__No24of2019.pdf
+2026-01-20 15:41:35,596 - hospital_retriever - INFO - Loaded 49 pages from hospital_docs\TheDataProtectionAct__No24of2019.pdf
+2026-01-20 15:41:35,596 - hospital_retriever - INFO - Loading PDF: hospital_docs\WHO Global Digital Health Strategy 2020-2025.pdf
+2026-01-20 15:41:36,373 - hospital_retriever - INFO - Loaded 60 pages from hospital_docs\WHO Global Digital Health Strategy 2020-2025.pdf
+2026-01-20 15:41:36,373 - hospital_retriever - INFO - Loading website content from: https://www.kutrrh.go.ke
+C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host 'www.kutrrh.go.ke'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+  warnings.warn(
+2026-01-20 15:41:41,555 - hospital_retriever - INFO - Loaded content from https://www.kutrrh.go.ke
+2026-01-20 15:41:41,555 - hospital_retriever - INFO - Loading website content from: https://www.kutrrh.go.ke/about
+C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host 'www.kutrrh.go.ke'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+  warnings.warn(
+C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host 'www.kutrrh.go.ke'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+  warnings.warn(
+2026-01-20 15:41:44,234 - hospital_retriever - INFO - Loaded content from https://www.kutrrh.go.ke/about
+2026-01-20 15:41:44,234 - hospital_retriever - INFO - Loading website content from: https://www.kutrrh.go.ke/departments
+C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host 'www.kutrrh.go.ke'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+  warnings.warn(
+2026-01-20 15:41:46,975 - hospital_retriever - WARNING - Error loading website https://www.kutrrh.go.ke/departments: 404 Client Error: Not Found for url: https://www.kutrrh.go.ke/departments
+2026-01-20 15:41:46,975 - hospital_retriever - INFO - Loading website content from: https://www.kutrrh.go.ke/services
+C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host 'www.kutrrh.go.ke'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+  warnings.warn(
+C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py:1097: InsecureRequestWarning: Unverified HTTPS request is being made to host 'www.kutrrh.go.ke'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/latest/advanced-usage.html#tls-warnings
+  warnings.warn(
+2026-01-20 15:41:49,797 - hospital_retriever - INFO - Loaded content from https://www.kutrrh.go.ke/services
+2026-01-20 15:41:49,798 - hospital_retriever - INFO - Chunking 782 documents with size 800
+2026-01-20 15:41:49,899 - hospital_retriever - INFO - Created 2513 chunks from 782 documents
+2026-01-20 15:41:49,900 - hospital_retriever - INFO - Building new vector store with 2513 documents
+2026-01-20 15:43:21,029 - hospital_retriever - INFO - Vector store saved to hospital_vector_store
+2026-01-20 15:43:21,030 - hospital_retriever - INFO - Hospital knowledge base initialized successfully
+2026-01-20 15:43:21,031 - hospital_setup - INFO - Hospital knowledge base setup successful
+Setup result: True
+Vector store files: ['index.faiss', 'index.pkl']

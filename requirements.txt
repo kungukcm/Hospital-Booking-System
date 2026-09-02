@@ -14,3 +14,9 @@ numpy
 pandas
 scikit-learn
 joblib
+PyPDF2
+pdf2image
+faiss-cpu
+sentence-transformers
+beautifulsoup4
+requests

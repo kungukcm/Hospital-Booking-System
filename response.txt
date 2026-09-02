@@ -1,0 +1,11 @@
+2026-01-20 23:48:04.297746: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-01-20 23:48:06.116286: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING:tensorflow:From C:\Users\ckmat\AppData\Local\Programs\Python\Python313\Lib\site-packages\tf_keras\src\losses.py:2976: The name tf.losses.sparse_softmax_cross_entropy is deprecated. Please use tf.compat.v1.losses.sparse_softmax_cross_entropy instead.
+
+USER_AGENT environment variable not set, consider setting it to identify your requests.
+Testing query: 'What are the payment methods?'
+======================================================================
+Traceback (most recent call last):
+  File "C:\Users\ckmat\OneDrive\Documents\Masters ICT Policy\Thesis\Thesis Project\AI Assistant\test_response.py", line 15, in <module>
+    result = search_hospital_information(query)
+TypeError: 'StructuredTool' object is not callable

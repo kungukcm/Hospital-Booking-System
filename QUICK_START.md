@@ -1,32 +1,127 @@
-# Hospital Booking System - Quick Start Guide
+# Hospital Chat Assistant - Quick Start Guide 🚀
 
-## 🚀 Get Started in 5 Minutes
+## Status: ✅ KNOWLEDGE BASE READY
 
-### Step 1: Get Your Groq API Key
-1. Visit https://console.groq.com
-2. Sign up or log in
-3. Create an API key
-4. Copy your API key
+Your hospital chat assistant now has:
+- ✅ 21 hospital documents indexed
+- ✅ Hospital website content scraped
+- ✅ Semantic search enabled
+- ✅ Appointment booking (still works!)
 
-### Step 2: Setup Local Environment
+---
 
-```bash
-# Navigate to project directory
-cd "path/to/Hospital Booking System"
+## Get Started in 30 Seconds
 
-# Create virtual environment (Windows)
-python -m venv venv
-.\venv\Scripts\activate
-
-# Create virtual environment (macOS/Linux)
-python -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+### Step 1: Start the Application
+```powershell
+cd "C:\Users\ckmat\OneDrive\Documents\Masters ICT Policy\Thesis\Thesis Project\AI Assistant"
+streamlit run app.py
 ```
 
-### Step 3: Configure API Key
+### Step 2: Browser Opens Automatically
+The app opens at `http://localhost:8501`
+
+### Step 3: Start Chatting!
+
+---
+
+## Try These Queries
+
+### Hospital Information
+- "Tell me about KUTRRH services"
+- "What are your contact numbers?"
+- "What is the hospital's vision?"
+- "How can I visit the hospital?"
+- "Do you have an ICU?"
+
+### Appointment Booking
+- "I want to book an appointment"
+- "Schedule me for next Tuesday at 2 PM"
+- "When can I see a doctor?"
+
+---
+
+## What's New vs Before
+
+| Before | After |
+|--------|-------|
+| ❌ Only appointment booking | ✅ Hospital info + appointments |
+| ❌ No context about hospital | ✅ Answers from 21 documents |
+| ❌ Generic responses | ✅ Source-attributed answers |
+| ❌ Limited knowledge | ✅ Semantic search capability |
+
+---
+
+## Knowledge Base Status
+
+```
+📁 Documents: hospital_docs/
+   ✅ 21 PDFs indexed
+   
+🌐 Website: https://www.kutrrh.go.ke
+   ✅ 3 pages scraped
+   
+🔍 Vector Store: hospital_vector_store/
+   ✅ 0.11 MB (fully indexed)
+   
+📊 Total Content: 44 chunks
+   ✅ Ready for queries
+```
+
+---
+
+## Quick Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| App won't start | `pip install -r requirements.txt` then retry |
+| Knowledge base empty | `python initialize_knowledge_base.py` |
+| Want to add docs | Place PDFs in `hospital_docs/` then reinitialize |
+| Slow responses | Wait 20 seconds for first query (caching) |
+
+---
+
+## Environment
+
+- **Python**: 3.13.7 ✅
+- **API**: Groq (llama-3.3-70b) ✅
+- **Storage**: FAISS Vector Store ✅
+- **Documents**: 21 PDFs + Website ✅
+
+---
+
+## Features
+
+🏥 **Hospital Information**
+- Semantic search of documents
+- Website content integration
+- Source attribution for all answers
+
+📅 **Appointment Booking**
+- Schedule appointments
+- View existing appointments
+- Appointment reminders
+
+🔄 **Smart Routing**
+- Automatically detects intent
+- Routes to appropriate tool
+- Seamless conversation flow
+
+---
+
+## Next Steps
+
+1. ▶️ Run `streamlit run app.py`
+2. ❓ Ask a hospital question
+3. 📅 Test appointment booking
+4. 📄 Add more documents if needed
+
+---
+
+**See Also**: 
+- `KNOWLEDGE_BASE_READY.md` - Detailed technical info
+- `hospital_docs/` - Your indexed documents
+- `hospital_vector_store/` - Vector embeddings
 
 **Option A - Using .env file (Recommended for local development):**
 ```bash

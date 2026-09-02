@@ -69,7 +69,8 @@ def add_appointment(appointment: Dict) -> Dict:
 def get_appointments(
     filter_by_date: Optional[str] = None,
     filter_by_type: Optional[str] = None,
-    filter_by_status: Optional[str] = None
+    filter_by_status: Optional[str] = None,
+    limit: Optional[int] = None
 ) -> List[Dict]:
     """
     Get appointments with optional filtering
@@ -99,7 +100,30 @@ def get_appointments(
     if filter_by_date:
         appointments = [a for a in appointments if a.get('datetime', '').startswith(filter_by_date)]
     
-    return sorted(appointments, key=lambda x: x.get('datetime', ''))
+    appointments = sorted(appointments, key=lambda x: x.get('datetime', ''))
+    return appointments[:limit] if limit is not None else appointments
+
+
+def get_appointment(appointment_id: str) -> Optional[Dict]:
+    """
+    Get a single appointment by ID
+    
+    Args:
+        appointment_id: The appointment ID to retrieve
+    
+    Returns:
+        Appointment dict if found, None otherwise
+    """
+    ensure_db_exists()
+    
+    with open(APPOINTMENTS_DB, 'r') as f:
+        data = json.load(f)
+    
+    for apt in data['appointments']:
+        if apt.get('id') == appointment_id:
+            return apt
+    
+    return None
 
 
 def cancel_appointment(appointment_id: str, reason: str = "") -> bool:

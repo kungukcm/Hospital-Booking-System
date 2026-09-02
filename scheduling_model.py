@@ -148,7 +148,11 @@ class SchedulingPredictor:
         
         try:
             features = self.extract_features(appointment_type, appointment_datetime)
-            features = np.expand_dims(features, axis=0)  # Add batch dimension
+            # TCN model expects shape (batch, timesteps, features) = (1, 1, 25)
+            # Pad feature vector to 25 if shorter
+            if len(features) < 25:
+                features = np.pad(features, (0, 25 - len(features)))
+            features = features.reshape(1, 1, len(features))  # (1, 1, 25)
             
             # Make prediction
             if self.model.__class__.__module__.startswith('torch'):

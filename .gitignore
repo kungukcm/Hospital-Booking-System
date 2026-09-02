@@ -3,6 +3,17 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Runtime data (appointments, admin credentials/tokens, analytics logs) - use a persistent volume in production
+data/
+
+# Local document extraction and backup artifacts
+_tmp_doc_extract/
+References/.tmp_ref_extract.py
+*.BACKUP*.docx
+
+# Streamlit secrets (API keys) - never commit; kutrrh_logo.png in this folder IS committed
+.streamlit/secrets.toml
+
 # C extensions
 *.so
 

@@ -1,0 +1,1 @@
+Get-Process | Where-Object { $_.ProcessName -like '*streamlit*' } | ForEach-Object { Stop-Process -Id $_.Id -Force }
