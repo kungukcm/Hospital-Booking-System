@@ -9,6 +9,7 @@ This repository uses a split deployment:
 
 ```toml
 BACKEND_URL = "https://YOUR-RENDER-SERVICE.onrender.com"
+GROQ_API_KEY = "gsk_your_key_here"
 ```
 
 3. Create a second Streamlit Community Cloud app from `admin_dashboard.py` and add the same `BACKEND_URL` secret. This is the protected management dashboard.

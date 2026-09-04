@@ -1,8 +1,8 @@
 streamlit
 langchain
 langgraph
-langchain_core
-langchain_community
+langchain-core
+langchain-community
 openai
 loguru
 langchain-groq
@@ -18,5 +18,7 @@ PyPDF2
 pdf2image
 faiss-cpu
 sentence-transformers
+langchain-huggingface
+tf-keras
 beautifulsoup4
 requests
