@@ -18,10 +18,20 @@ from langchain_core.messages import HumanMessage, AIMessage
 from config import AppConfig
 from appointments_db import add_appointment, get_appointments, get_appointment
 from appointment_recommender import get_recommender
+from email_service import send_appointment_confirmation_email
 from hospital_setup import setup_hospital_knowledge_base
 from auth import authenticate_admin, verify_admin_token, create_admin_user, get_admin_users, VALID_ROLES
 from logger import setup_logger
-from feedback_store import add_feedback, initialize_store, list_chat_logs, list_feedback, log_chat
+from feedback_store import (
+    add_feedback,
+    initialize_store,
+    list_chat_logs,
+    list_feedback,
+    log_chat,
+    get_chat_quality_stats,
+    list_email_notifications,
+)
+import time
 
 logger = setup_logger(__name__)
 config = AppConfig()
@@ -183,6 +193,7 @@ async def chat(request: ChatRequest, http_request: Request):
     Returns:
         AI response and full conversation history
     """
+    start_time = time.monotonic()
     try:
         # Convert conversation history to langchain messages
         conversation = []
@@ -211,8 +222,9 @@ async def chat(request: ChatRequest, http_request: Request):
                 response_text = msg.content
                 break
 
+        response_time_ms = (time.monotonic() - start_time) * 1000
         client_ip = http_request.client.host if http_request.client else "unknown"
-        log_chat(client_ip, request.message, response_text)
+        log_chat(client_ip, request.message, response_text, response_time_ms=response_time_ms)
         
         logger.info(f"Chat processed successfully. Conversation length: {len(conversation)}")
         return ChatResponse(
@@ -221,6 +233,9 @@ async def chat(request: ChatRequest, http_request: Request):
         )
     
     except Exception as e:
+        response_time_ms = (time.monotonic() - start_time) * 1000
+        client_ip = http_request.client.host if http_request.client else "unknown"
+        log_chat(client_ip, request.message, "", response_time_ms=response_time_ms, flag_reason="exception")
         logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Chat processing error: {str(e)}")
 
@@ -275,7 +290,21 @@ async def create_appointment(request: AppointmentRequest):
     try:
         appointment_data = request.model_dump()
         result = add_appointment(appointment_data)
-        
+
+        try:
+            appointment_dt = datetime.fromisoformat(result["datetime"])
+            time_display = appointment_dt.strftime("%B %d, %Y at %I:%M %p")
+        except ValueError:
+            time_display = result["datetime"]
+
+        send_appointment_confirmation_email(
+            recipient_email=result["email"],
+            patient_name=result["name"],
+            appointment_id=result["id"],
+            appointment_type=result["type"],
+            appointment_time_display=time_display,
+        )
+
         logger.info(f"Appointment created: {result['id']}")
         return AppointmentResponse(**result)
     except Exception as e:
@@ -442,6 +471,18 @@ async def admin_get_chat_logs(
 ):
     """Return the chat audit log, optionally filtered by client IP."""
     return list_chat_logs(ip_address=ip_address)
+
+
+@app.get("/admin/chat-quality", response_model=Dict[str, Any])
+async def admin_get_chat_quality(admin_user: str = Depends(verify_admin_auth)):
+    """Return chat responsiveness/hallucination metrics for the admin dashboard."""
+    return get_chat_quality_stats()
+
+
+@app.get("/admin/email-notifications", response_model=List[Dict[str, Any]])
+async def admin_get_email_notifications(admin_user: str = Depends(verify_admin_auth)):
+    """Return the log of appointment confirmation emails sent to patients."""
+    return list_email_notifications()
 
 
 @app.post("/admin/create-user", response_model=AdminResponse)

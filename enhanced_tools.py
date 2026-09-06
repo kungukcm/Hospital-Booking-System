@@ -10,6 +10,7 @@ from logger import setup_logger
 from config import AppConfig
 from appointments_db import add_appointment, cancel_appointment as db_cancel, get_appointments, check_conflict, get_appointment_stats, get_next_appointment as get_next_apt_db
 from appointment_recommender import get_recommender, CongestionCategory
+from email_service import send_appointment_confirmation_email
 
 logger = setup_logger(__name__)
 config = AppConfig()
@@ -75,7 +76,20 @@ def book_appointment(person_name: str, patient_id: str, phone_number: str, email
         
         # Save to database
         saved_apt = add_appointment(appointment_record)
-        
+
+        # Send confirmation email (best-effort; booking already succeeded regardless of outcome)
+        email_sent = send_appointment_confirmation_email(
+            recipient_email=email_address.strip(),
+            patient_name=person_name.strip(),
+            appointment_id=saved_apt['id'],
+            appointment_type=appointment_type,
+            appointment_time_display=appointment_time.strftime('%B %d, %Y at %I:%M %p'),
+        )
+        email_status_line = (
+            "📧 **Confirmation email sent**" if email_sent
+            else "⚠️ Confirmation email could not be sent; please note your Appointment ID."
+        )
+
         # Format response
         response = (
             f"✅ **Appointment Booked!**\n\n"
@@ -88,6 +102,7 @@ def book_appointment(person_name: str, patient_id: str, phone_number: str, email
             f"{congestion['emoji']} **Congestion Level:** {congestion['level']}\n"
             f"⏱️ **Predicted Wait:** {wait_time:.0f} minutes\n"
             f"📊 **Confidence:** {confidence*100:.0f}%\n"
+            f"{email_status_line}\n"
             f"{conflict_warning}"
         )
         

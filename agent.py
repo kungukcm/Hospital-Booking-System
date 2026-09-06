@@ -98,12 +98,24 @@ def should_continue_caller(state: AgentState) -> str:
 def is_greeting_or_social_message(message_content: str) -> bool:
     """Handle generic greetings or social chat without hitting the external LLM."""
     text = normalize_text(message_content)
+
+    # Structured patient-detail submissions (name, ID, phone, email, comma-separated
+    # fields, etc.) must never be misread as a greeting even if a name/word happens
+    # to contain a short marker like "hi" (e.g. "Chirchir", "This", "White").
+    looks_like_patient_details = (
+        "@" in text
+        or text.count(",") >= 2
+        or bool(re.search(r"\d{6,}", text))
+    )
+    if looks_like_patient_details:
+        return False
+
     greeting_markers = [
         'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
-        'habari', 'mambo', 'jambo', 'salaam', 'hujambo', ' habari',
+        'habari', 'mambo', 'jambo', 'salaam', 'hujambo',
         'how are you', 'howdy', 'greetings'
     ]
-    return any(marker in text for marker in greeting_markers)
+    return any(re.search(rf"\b{re.escape(marker)}\b", text) for marker in greeting_markers)
 
 
 def is_hospital_query(message_content: str) -> bool:

@@ -166,13 +166,15 @@ def show_admin_dashboard():
     st.divider()
     
     # Tabs for different admin functions
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "📊 Dashboard",
         "📅 Appointments",
         "⚙️ System",
         "👥 Users",
         "📝 Feedback",
-        "💬 Chat Logs"
+        "💬 Chat Logs",
+        "🩺 Chat Quality",
+        "📧 Email Notifications"
     ])
     
     # ====================================================================
@@ -416,6 +418,52 @@ def show_admin_dashboard():
             st.dataframe(logs, use_container_width=True, hide_index=True)
         else:
             st.info("No chat logs found.")
+
+    with tab7:
+        st.subheader("🩺 Chat Responsiveness & Hallucination Tracking")
+        st.caption("Flags responses that were slow, empty, or fell back to an error message (possible hallucination/failure).")
+        quality = call_backend_auth("/admin/chat-quality", token=st.session_state.admin_token)
+        if quality:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total chats", quality.get("total_chats", 0))
+            with col2:
+                st.metric("Flagged", quality.get("flagged_count", 0), delta=f"{quality.get('flagged_rate_pct', 0)}%")
+            with col3:
+                avg_ms = quality.get("avg_response_time_ms")
+                st.metric("Avg response time", f"{avg_ms:.0f} ms" if avg_ms is not None else "N/A")
+            with col4:
+                st.metric("Slow responses (>8s)", quality.get("slow_response_count", 0))
+
+            st.divider()
+            st.markdown("**Recent flagged interactions**")
+            recent = quality.get("recent_flagged") or []
+            if recent:
+                st.dataframe(recent, use_container_width=True, hide_index=True)
+            else:
+                st.info("No flagged interactions recorded.")
+        else:
+            st.info("No chat quality data available yet.")
+
+    with tab8:
+        st.subheader("📧 Appointment Confirmation Emails")
+        st.caption("Record of confirmation emails sent to patients after booking.")
+        notifications = call_backend_auth("/admin/email-notifications", token=st.session_state.admin_token)
+        if notifications:
+            sent = len([n for n in notifications if n.get("status") == "sent"])
+            failed = len([n for n in notifications if n.get("status") == "failed"])
+            skipped = len([n for n in notifications if n.get("status") == "skipped"])
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Sent", sent)
+            with col2:
+                st.metric("Failed", failed)
+            with col3:
+                st.metric("Skipped (SMTP not configured)", skipped)
+            st.divider()
+            st.dataframe(notifications, use_container_width=True, hide_index=True)
+        else:
+            st.info("No confirmation emails recorded yet.")
 
 
 # ============================================================================

@@ -856,7 +856,7 @@ def page_book_appointment():
                                 
                                 st.info(
                                     "✓ Please arrive 15 minutes early for check-in\n\n"
-                                    "✓ A confirmation SMS and email have been sent to you\n\n"
+                                    "✓ A confirmation email has been sent to you if email delivery is configured\n\n"
                                     "✓ Keep your Appointment ID for your records"
                                 )
                                 
