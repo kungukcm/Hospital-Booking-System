@@ -1,0 +1,27 @@
+# Slim requirements for Render deployment.
+# Excludes heavyweight TF/torch training deps that lack Python 3.14 wheels.
+# The appointment recommender degrades to mock predictions without TensorFlow.
+# Full local dev/ML environment: requirements.txt
+
+streamlit
+langchain
+langgraph
+langchain-core
+langchain-community
+openai
+loguru
+langchain-groq
+fastapi
+uvicorn
+python-dotenv
+numpy
+pandas
+scikit-learn
+joblib
+PyPDF2
+pdf2image
+faiss-cpu
+sentence-transformers
+langchain-huggingface
+beautifulsoup4
+requests

@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: standard
     pythonVersion: 3.11.9
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements-render.txt
     startCommand: uvicorn backend_api:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     disk:
@@ -24,7 +24,7 @@ services:
     runtime: python
     plan: free
     pythonVersion: 3.11.9
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements-render.txt
     startCommand: streamlit run frontend_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
     healthCheckPath: /healthz
     envVars:
@@ -36,7 +36,7 @@ services:
     runtime: python
     plan: free
     pythonVersion: 3.11.9
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements-render.txt
     startCommand: streamlit run admin_dashboard.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
     healthCheckPath: /healthz
     envVars:

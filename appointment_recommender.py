@@ -7,16 +7,26 @@ import numpy as np
 import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple
-from scheduling_model import SchedulingPredictor
 import logging
 
 # Set random seeds for deterministic predictions
 os.environ['PYTHONHASHSEED'] = '0'
 np.random.seed(42)
+
+try:
+    from scheduling_model import SchedulingPredictor
+    _SCHEDULING_AVAILABLE = True
+except Exception as e:  # TensorFlow or model deps unavailable
+    SchedulingPredictor = None
+    _SCHEDULING_AVAILABLE = False
+    logging.getLogger(__name__).warning(
+        f"SchedulingPredictor unavailable ({e}). Appointment recommendations will use mock predictions."
+    )
+
 try:
     import tensorflow as tf
     tf.random.set_seed(42)
-except ImportError:
+except Exception:
     pass
 
 logger = logging.getLogger(__name__)
@@ -65,6 +75,11 @@ class AppointmentRecommender:
     
     def __init__(self, model_path: str = "models/tcn_scheduling_model.h5"):
         """Initialize with TCN scheduling model"""
+        if not _SCHEDULING_AVAILABLE:
+            self.predictor = None
+            self.model_loaded = False
+            logger.warning("Scheduling model dependencies unavailable. Using mock predictions.")
+            return
         try:
             self.predictor = SchedulingPredictor(
                 model_path=model_path,
