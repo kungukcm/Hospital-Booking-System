@@ -37,6 +37,22 @@ import time
 logger = setup_logger(__name__)
 config = AppConfig()
 
+
+def get_client_ip(http_request: Request) -> str:
+    """Return the real visitor IP, not the reverse proxy's IP.
+
+    Render (and most PaaS platforms) terminate connections at a load balancer,
+    so `request.client.host` is always the proxy's own IP. The actual client
+    IP is forwarded in the X-Forwarded-For header as the first entry.
+    """
+    forwarded_for = http_request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    real_ip = http_request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return http_request.client.host if http_request.client else "unknown"
+
 app = FastAPI(title="KUTRRH Hospital Appointment System API", version="1.0.0")
 initialize_store()
 
@@ -235,7 +251,7 @@ async def chat(request: ChatRequest, http_request: Request):
                 break
 
         response_time_ms = (time.monotonic() - start_time) * 1000
-        client_ip = http_request.client.host if http_request.client else "unknown"
+        client_ip = get_client_ip(http_request)
         log_chat(client_ip, request.message, response_text, response_time_ms=response_time_ms)
         
         logger.info(f"Chat processed successfully. Conversation length: {len(conversation)}")
@@ -246,7 +262,7 @@ async def chat(request: ChatRequest, http_request: Request):
     
     except Exception as e:
         response_time_ms = (time.monotonic() - start_time) * 1000
-        client_ip = http_request.client.host if http_request.client else "unknown"
+        client_ip = get_client_ip(http_request)
         log_chat(client_ip, request.message, "", response_time_ms=response_time_ms, flag_reason="exception")
         logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Chat processing error: {str(e)}")
@@ -264,7 +280,7 @@ async def submit_feedback(request: FeedbackRequest, http_request: Request):
     if request.rating is not None and not 1 <= request.rating <= 5:
         raise HTTPException(status_code=422, detail="Rating must be between 1 and 5")
 
-    client_ip = http_request.client.host if http_request.client else "unknown"
+    client_ip = get_client_ip(http_request)
     structured = {
         "functions_used": request.functions_used,
         "booking_success": request.booking_success,
