@@ -18,6 +18,20 @@ ERROR_RESPONSE_MARKERS = [
     "❌ error",
 ]
 
+# Structured multiple-choice feedback questions, in submission order.
+# Column name -> (question label shown on the admin chart, legacy text-message label prefix)
+FEEDBACK_QUESTIONS = [
+    ("functions_used", "Functions used", "Functions used"),
+    ("booking_success", "Booking completed successfully?", "Booking completion and confirmation"),
+    ("information_accuracy", "Information accurate & sourced?", "Information accuracy and official sourcing"),
+    ("knowledge_base_honesty", "Honest when KB had no answer?", "Knowledge-base honesty"),
+    ("queue_recommendations", "Queue recommendations useful?", "Queue/slot recommendations"),
+    ("language_consistency", "Consistent preferred language?", "Language consistency"),
+    ("misread_request", "Misread what user wanted?", "Request interpretation errors"),
+    ("personal_details_concern", "Concerned about personal details?", "Personal-details concerns"),
+]
+FEEDBACK_QUESTION_COLUMNS = [column for column, _, _ in FEEDBACK_QUESTIONS] + ["natural_effort", "confidence_change", "additional_feedback"]
+
 
 def _connection() -> sqlite3.Connection:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -66,17 +80,35 @@ def initialize_store() -> None:
             if column not in existing_columns:
                 connection.execute(ddl)
 
+        # Migrate older feedback tables to add structured per-question answer columns.
+        existing_feedback_columns = {row["name"] for row in connection.execute("PRAGMA table_info(feedback)")}
+        for column in FEEDBACK_QUESTION_COLUMNS:
+            if column not in existing_feedback_columns:
+                connection.execute(f"ALTER TABLE feedback ADD COLUMN {column} TEXT")
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def add_feedback(email: str, message: str, ip_address: str, rating: Optional[int] = None) -> Dict[str, Any]:
+def add_feedback(
+    email: str,
+    message: str,
+    ip_address: str,
+    rating: Optional[int] = None,
+    structured: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     initialize_store()
+    structured = structured or {}
+    columns = ["email", "rating", "message", "ip_address", "created_at"] + FEEDBACK_QUESTION_COLUMNS
+    values = [email.strip(), rating, message.strip(), ip_address, _now()] + [
+        structured.get(column) for column in FEEDBACK_QUESTION_COLUMNS
+    ]
     with _connection() as connection:
+        placeholders = ", ".join("?" for _ in columns)
         cursor = connection.execute(
-            "INSERT INTO feedback (email, rating, message, ip_address, created_at) VALUES (?, ?, ?, ?, ?)",
-            (email.strip(), rating, message.strip(), ip_address, _now()),
+            f"INSERT INTO feedback ({', '.join(columns)}) VALUES ({placeholders})",
+            values,
         )
         return {"id": cursor.lastrowid, "message": "Feedback submitted successfully"}
 
@@ -178,10 +210,92 @@ def list_feedback(limit: int = 200) -> List[Dict[str, Any]]:
     initialize_store()
     with _connection() as connection:
         rows = connection.execute(
-            "SELECT id, email, rating, message, ip_address, created_at FROM feedback ORDER BY id DESC LIMIT ?",
+            "SELECT * FROM feedback ORDER BY id DESC LIMIT ?",
             (max(1, min(limit, 1000)),),
         ).fetchall()
         return [dict(row) for row in rows]
+
+
+# Older feedback rows only stored a concatenated free-text message (before
+# structured columns were introduced); parse per-question answers from it.
+def _parse_legacy_feedback_message(message: str) -> Dict[str, Any]:
+    answers: Dict[str, Any] = {}
+    lines = [line.strip() for line in (message or "").splitlines() if ":" in line]
+    label_to_column = {legacy_label: column for column, _, legacy_label in FEEDBACK_QUESTIONS}
+
+    for line in lines:
+        label, _, value = line.partition(":")
+        label = label.strip()
+        value = value.strip()
+        if label in label_to_column:
+            answers[label_to_column[label]] = value
+        elif label == "Natural/low-effort rating":
+            answers["natural_effort"] = value.split("/")[0].strip()
+        elif label == "Confidence improvement":
+            answers["confidence_change"] = value
+        elif label == "Additional comments":
+            answers["additional_feedback"] = value
+
+    return answers
+
+
+# Structured columns take priority; fall back to parsing the legacy message.
+def _effective_feedback_answers(row: Dict[str, Any]) -> Dict[str, Any]:
+    legacy = _parse_legacy_feedback_message(row.get("message", ""))
+    answers: Dict[str, Any] = {}
+    for column in FEEDBACK_QUESTION_COLUMNS:
+        value = row.get(column)
+        answers[column] = value if value not in (None, "") else legacy.get(column)
+    return answers
+
+
+def get_feedback_stats() -> Dict[str, Any]:
+    """Aggregate multiple-choice answer counts per question for dashboard charts."""
+    rows = list_feedback(limit=1000)
+    question_counts: Dict[str, Dict[str, int]] = {
+        column: {} for column, _, _ in FEEDBACK_QUESTIONS
+    }
+    natural_effort_values: List[int] = []
+
+    for row in rows:
+        answers = _effective_feedback_answers(row)
+
+        for column, _, _ in FEEDBACK_QUESTIONS:
+            value = answers.get(column)
+            if not value:
+                continue
+            if column == "functions_used":
+                options = [v.strip() for v in value.split(",") if v.strip()]
+            else:
+                options = [value]
+            for option in options:
+                question_counts[column][option] = question_counts[column].get(option, 0) + 1
+
+        effort_value = answers.get("natural_effort")
+        if effort_value not in (None, ""):
+            try:
+                natural_effort_values.append(int(str(effort_value).split("/")[0]))
+            except ValueError:
+                pass
+
+    questions = [
+        {
+            "column": column,
+            "label": label,
+            "counts": question_counts[column],
+        }
+        for column, label, _ in FEEDBACK_QUESTIONS
+    ]
+
+    return {
+        "total_feedback": len(rows),
+        "questions": questions,
+        "avg_natural_effort": round(sum(natural_effort_values) / len(natural_effort_values), 2)
+        if natural_effort_values else None,
+        "natural_effort_distribution": {
+            str(v): natural_effort_values.count(v) for v in sorted(set(natural_effort_values))
+        },
+    }
 
 
 def list_chat_logs(limit: int = 500, ip_address: Optional[str] = None) -> List[Dict[str, Any]]:

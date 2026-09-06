@@ -565,7 +565,22 @@ def page_feedback():
                 result = call_backend(
                     "/feedback",
                     method="POST",
-                    data={"email": email, "rating": natural_effort, "message": message},
+                    data={
+                        "email": email,
+                        "rating": natural_effort,
+                        "message": message,
+                        "functions_used": ", ".join(functions_used),
+                        "booking_success": booking_success,
+                        "information_accuracy": information_accuracy,
+                        "knowledge_base_honesty": knowledge_base_honesty,
+                        "queue_recommendations": queue_recommendations,
+                        "language_consistency": language_consistency,
+                        "misread_request": misread_request,
+                        "personal_details_concern": personal_details_concern,
+                        "natural_effort": natural_effort,
+                        "confidence_change": confidence_change.strip(),
+                        "additional_feedback": additional_feedback.strip(),
+                    },
                 )
                 if result:
                     st.success("Thank you. Your feedback was submitted successfully.")

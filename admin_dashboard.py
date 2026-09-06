@@ -8,6 +8,7 @@ import streamlit as st
 import requests
 import logging
 import os
+import pandas as pd
 from datetime import datetime
 from urllib.parse import quote
 
@@ -400,6 +401,38 @@ def show_admin_dashboard():
 
     with tab5:
         st.subheader("📝 User Feedback")
+        stats = call_backend_auth("/admin/feedback-stats", token=st.session_state.admin_token)
+
+        if stats and stats.get("total_feedback"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total feedback submissions", stats.get("total_feedback", 0))
+            with col2:
+                avg_effort = stats.get("avg_natural_effort")
+                st.metric("Avg. low-effort rating (1-5)", f"{avg_effort:.2f}" if avg_effort is not None else "N/A")
+
+            st.divider()
+            st.markdown("### 📊 Multiple-Choice Question Breakdown")
+            for question in stats.get("questions", []):
+                counts = question.get("counts") or {}
+                if not counts:
+                    continue
+                st.markdown(f"**{question['label']}**")
+                chart_df = pd.DataFrame(
+                    {"Responses": list(counts.values())},
+                    index=list(counts.keys()),
+                )
+                st.bar_chart(chart_df)
+
+            effort_dist = stats.get("natural_effort_distribution") or {}
+            if effort_dist:
+                st.markdown("**Natural / low-effort rating (1 = hard, 5 = effortless)**")
+                st.bar_chart(pd.DataFrame({"Responses": list(effort_dist.values())}, index=list(effort_dist.keys())))
+        else:
+            st.info("No feedback submitted yet.")
+
+        st.divider()
+        st.markdown("### 📋 Raw Feedback Records")
         feedback = call_backend_auth("/admin/feedback", token=st.session_state.admin_token)
         if feedback:
             st.dataframe(feedback, use_container_width=True, hide_index=True)

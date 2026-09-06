@@ -29,6 +29,7 @@ from feedback_store import (
     list_feedback,
     log_chat,
     get_chat_quality_stats,
+    get_feedback_stats,
     list_email_notifications,
 )
 import time
@@ -71,6 +72,17 @@ class FeedbackRequest(BaseModel):
     email: str
     message: str
     rating: Optional[int] = None
+    functions_used: Optional[str] = None
+    booking_success: Optional[str] = None
+    information_accuracy: Optional[str] = None
+    knowledge_base_honesty: Optional[str] = None
+    queue_recommendations: Optional[str] = None
+    language_consistency: Optional[str] = None
+    misread_request: Optional[str] = None
+    personal_details_concern: Optional[str] = None
+    natural_effort: Optional[int] = None
+    confidence_change: Optional[str] = None
+    additional_feedback: Optional[str] = None
 
 
 class FeedbackResponse(BaseModel):
@@ -253,7 +265,20 @@ async def submit_feedback(request: FeedbackRequest, http_request: Request):
         raise HTTPException(status_code=422, detail="Rating must be between 1 and 5")
 
     client_ip = http_request.client.host if http_request.client else "unknown"
-    return add_feedback(email, message, client_ip, request.rating)
+    structured = {
+        "functions_used": request.functions_used,
+        "booking_success": request.booking_success,
+        "information_accuracy": request.information_accuracy,
+        "knowledge_base_honesty": request.knowledge_base_honesty,
+        "queue_recommendations": request.queue_recommendations,
+        "language_consistency": request.language_consistency,
+        "misread_request": request.misread_request,
+        "personal_details_concern": request.personal_details_concern,
+        "natural_effort": request.natural_effort,
+        "confidence_change": request.confidence_change,
+        "additional_feedback": request.additional_feedback,
+    }
+    return add_feedback(email, message, client_ip, request.rating, structured=structured)
 
 
 # ============================================================================
@@ -462,6 +487,12 @@ async def admin_system_status(admin_user: str = Depends(verify_admin_auth)):
 async def admin_get_feedback(admin_user: str = Depends(verify_admin_auth)):
     """Return submitted feedback for authenticated systems managers."""
     return list_feedback()
+
+
+@app.get("/admin/feedback-stats", response_model=Dict[str, Any])
+async def admin_get_feedback_stats(admin_user: str = Depends(verify_admin_auth)):
+    """Return per-question multiple-choice counts (Yes/Partly/No, etc.) for dashboard charts."""
+    return get_feedback_stats()
 
 
 @app.get("/admin/chat-logs", response_model=List[Dict[str, Any]])
