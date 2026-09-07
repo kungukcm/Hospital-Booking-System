@@ -51,10 +51,10 @@ def is_payment_query(query: str) -> bool:
     text = (query or "").lower()
     payment_markers = [
         "payment", "payments", "pay", "price", "cost", "fee", "tariff", "bill",
-        "matibabu", "lipia", "malipo", "mpesa", "credit card", "kadi ya mkopo",
+        "lipia", "malipo", "mpesa", "m-pesa", "credit card", "kadi ya mkopo",
         "cash", "insurance", "deposit", "paybill"
     ]
-    return any(marker in text for marker in payment_markers)
+    return any(re.search(rf"\b{re.escape(marker)}\b", text) for marker in payment_markers)
 
 
 def extract_targeted_leadership_answer(query: str, retrieved_results: list) -> Optional[str]:

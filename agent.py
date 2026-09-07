@@ -124,10 +124,12 @@ def is_hospital_query(message_content: str) -> bool:
         'hospital', 'service', 'department', 'contact', 'phone', 'address', 'location',
         'visiting hours', 'hours', 'insurance', 'payment', 'facility', 'staff', 'doctor',
         'nurse', 'clinic', 'kutrrh', 'kenyatta', 'teaching', 'referral', 'research',
-        'what can i get', 'available treatment', 'medical', 'healthcare', 'specialist',
+        'what can i get', 'available treatment', 'treatment', 'cancer', 'oncology',
+        'medical', 'healthcare', 'specialist',
         'tariff', 'cost', 'charge', 'bill', 'price', 'fee', 'payment method', 'pay',
         'ceo', 'chief executive', 'director', 'management', 'leadership', 'executive',
-        'who is', 'who runs', 'head of', 'administrator', 'matibabu', 'lipia', 'malipo',
+        'who is', 'who runs', 'head of', 'administrator', 'matibabu', 'saratani', 'onkolojia',
+        'lipia', 'malipo',
         'kulipa', 'mpesa', 'paybill', 'kadi ya mkopo', 'gharama', 'gharamu', 'kadi',
         'deposit', 'insurance', 'hospitali', 'anwani', 'barua pepe', 'posta'
     ]
