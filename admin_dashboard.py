@@ -167,7 +167,7 @@ def show_admin_dashboard():
     st.divider()
     
     # Tabs for different admin functions
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
         "📊 Dashboard",
         "📅 Appointments",
         "⚙️ System",
@@ -175,7 +175,8 @@ def show_admin_dashboard():
         "📝 Feedback",
         "💬 Chat Logs",
         "🩺 Chat Quality",
-        "📧 Email Notifications"
+        "📧 Email Notifications",
+        "🌐 Visitor IPs"
     ])
     
     # ====================================================================
@@ -497,6 +498,17 @@ def show_admin_dashboard():
             st.dataframe(notifications, use_container_width=True, hide_index=True)
         else:
             st.info("No confirmation emails recorded yet.")
+
+    with tab9:
+        st.subheader("🌐 Unique Visitor IP Addresses")
+        st.caption("Every distinct IP address that has used the chat, feedback, or booking flow, with first/last seen and visit count.")
+        visitor_ips = call_backend_auth("/admin/visitor-ips", token=st.session_state.admin_token)
+        if visitor_ips:
+            st.metric("Unique IP addresses", len(visitor_ips))
+            st.divider()
+            st.dataframe(visitor_ips, use_container_width=True, hide_index=True)
+        else:
+            st.info("No visitor IP addresses recorded yet.")
 
 
 # ============================================================================

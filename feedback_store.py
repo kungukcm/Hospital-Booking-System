@@ -68,6 +68,13 @@ def initialize_store() -> None:
                 error_message TEXT,
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS visitor_ips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip_address TEXT NOT NULL UNIQUE,
+                first_seen TEXT NOT NULL,
+                last_seen TEXT NOT NULL,
+                hit_count INTEGER NOT NULL DEFAULT 1
+            );
             """
         )
         # Migrate older chat_logs tables (created before quality tracking existed).
@@ -91,6 +98,33 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def record_visitor_ip(ip_address: str) -> None:
+    """Track every distinct IP address seen, with first/last-seen and a hit count."""
+    if not ip_address or ip_address == "unknown":
+        return
+    initialize_store()
+    now = _now()
+    with _connection() as connection:
+        connection.execute(
+            """INSERT INTO visitor_ips (ip_address, first_seen, last_seen, hit_count)
+               VALUES (?, ?, ?, 1)
+               ON CONFLICT(ip_address) DO UPDATE SET
+                   last_seen = excluded.last_seen,
+                   hit_count = hit_count + 1""",
+            (ip_address, now, now),
+        )
+
+
+def list_visitor_ips(limit: int = 500) -> List[Dict[str, Any]]:
+    initialize_store()
+    with _connection() as connection:
+        rows = connection.execute(
+            "SELECT id, ip_address, first_seen, last_seen, hit_count FROM visitor_ips ORDER BY last_seen DESC LIMIT ?",
+            (max(1, min(limit, 5000)),),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
 def add_feedback(
     email: str,
     message: str,
@@ -110,7 +144,9 @@ def add_feedback(
             f"INSERT INTO feedback ({', '.join(columns)}) VALUES ({placeholders})",
             values,
         )
-        return {"id": cursor.lastrowid, "message": "Feedback submitted successfully"}
+        feedback_id = cursor.lastrowid
+    record_visitor_ip(ip_address)
+    return {"id": feedback_id, "message": "Feedback submitted successfully"}
 
 
 def classify_chat_quality(assistant_response: str, response_time_ms: Optional[float]) -> Optional[str]:
@@ -147,6 +183,7 @@ def log_chat(
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (ip_address, user_message, assistant_response, _now(), response_time_ms, flagged, flag_reason),
         )
+    record_visitor_ip(ip_address)
 
 
 def add_email_notification(

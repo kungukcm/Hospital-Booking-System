@@ -31,6 +31,7 @@ from feedback_store import (
     get_chat_quality_stats,
     get_feedback_stats,
     list_email_notifications,
+    list_visitor_ips,
 )
 import time
 
@@ -536,6 +537,12 @@ async def admin_get_chat_quality(admin_user: str = Depends(verify_admin_auth)):
 async def admin_get_email_notifications(admin_user: str = Depends(verify_admin_auth)):
     """Return the log of appointment confirmation emails sent to patients."""
     return list_email_notifications()
+
+
+@app.get("/admin/visitor-ips", response_model=List[Dict[str, Any]])
+async def admin_get_visitor_ips(admin_user: str = Depends(verify_admin_auth)):
+    """Return every distinct visitor IP address seen, with first/last-seen and hit count."""
+    return list_visitor_ips()
 
 
 @app.post("/admin/create-user", response_model=AdminResponse)
