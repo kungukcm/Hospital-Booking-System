@@ -307,24 +307,19 @@ def initialize_session_state():
         st.session_state.conversation = []
 
 
-def kutrrh_header():
-    """Display KUTRRH branded header with logo"""
+def application_header():
+    """Display the application header with a generic medical logo."""
     col1, col2, col3 = st.columns([1, 1.5, 1.5])
     
     with col1:
-        try:
-            logo_path = os.path.join(os.path.dirname(__file__), ".streamlit", "kutrrh_logo.png")
-            st.image(
-                logo_path,
-                width=250
-            )
-        except Exception as e:
-            logger.warning(f"Could not load logo: {str(e)}")
+        st.markdown("""
+        <div style="font-size: 3rem; color: #1f4788; font-weight: 700; line-height: 1;">✚</div>
+        """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
         <div class="header-container" style="text-align: center;">
-            <h1 style="margin: 0.5rem 0; font-size: 0.9rem;"><strong>Welcome to KUTRRH AI-Powered Appointment Manager</strong></h1>
+            <h1 style="margin: 0.5rem 0; font-size: 0.9rem;"><strong>AI-Powered Healthcare Assistant</strong></h1>
         </div>
         """, unsafe_allow_html=True)
     
@@ -595,8 +590,8 @@ def page_feedback():
 def main():
     initialize_session_state()
     
-    # Display KUTRRH header
-    kutrrh_header()
+    # Display application header
+    application_header()
     
     # Check backend connectivity with better error handling
     try:
@@ -619,9 +614,8 @@ def main():
     # Footer
     st.markdown("""
     <div class="footer">
-        <p>🏥 KUTRRH | AI-Powered Appointment Management System</p>
-        <p>For emergencies, call: <strong>+254 20 8 000 000</strong> | Support: help@kutrrh.go.ke</p>
-        <p style="font-size: 0.8rem; margin-top: 0.5rem;">© 2026 Kenyatta University Teaching, Referral and Research Hospital</p>
+        <p>AI-Powered Appointment Management System</p>
+        <p>For emergencies, contact your local emergency services.</p>
     </div>
     """, unsafe_allow_html=True)
 
