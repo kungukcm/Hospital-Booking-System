@@ -453,7 +453,7 @@ def page_chat():
         - 💳 Payment methods and insurance
         - 📍 Directions and facilities
         
-        **For appointment booking**, use the "📅 Book Appointment" page.
+        **For appointment booking**, tell the chat assistant that you would like to book an appointment.
         """)
     
     st.divider()
