@@ -39,12 +39,18 @@ config = AppConfig()
 
 
 def get_client_ip(http_request: Request) -> str:
-    """Return the real visitor IP, not the reverse proxy's IP.
+    """Return the real visitor IP, not the reverse proxy's (or calling service's) IP.
 
-    Render (and most PaaS platforms) terminate connections at a load balancer,
-    so `request.client.host` is always the proxy's own IP. The actual client
-    IP is forwarded in the X-Forwarded-For header as the first entry.
+    Requests reach this API either directly from a browser (behind Render's
+    load balancer, so `request.client.host` is the proxy's own IP) or via the
+    Streamlit frontend/admin-dashboard services making their own server-side
+    HTTP calls (so `request.client.host`/X-Forwarded-For would only ever show
+    that frontend service's IP, identical for every visitor). The frontend
+    forwards the true visitor IP explicitly via X-Client-IP; prefer that.
     """
+    client_ip_header = http_request.headers.get("x-client-ip")
+    if client_ip_header:
+        return client_ip_header.strip()
     forwarded_for = http_request.headers.get("x-forwarded-for")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()

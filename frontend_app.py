@@ -267,11 +267,27 @@ st.markdown(f"""
 def call_backend(endpoint: str, method: str = "GET", data: dict = None) -> dict:
     """Call backend API"""
     url = f"{BACKEND_URL}{endpoint}"
+    # The backend only ever sees this frontend server's own IP unless we forward
+    # the actual visitor's IP explicitly. st.context.ip_address is the raw
+    # WebSocket peer IP (Render's proxy, not the browser); the proxy-set
+    # X-Forwarded-For header on the original page request has the real one.
+    visitor_ip = None
+    try:
+        forwarded_for = st.context.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            visitor_ip = forwarded_for.split(",")[0].strip()
+        elif st.context.ip_address:
+            visitor_ip = st.context.ip_address
+    except Exception:
+        visitor_ip = None
+
+    headers = {"X-Client-IP": visitor_ip} if visitor_ip else {}
+
     try:
         if method == "GET":
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10)
         elif method == "POST":
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, headers=headers, timeout=10)
         else:
             raise ValueError(f"Unsupported method: {method}")
         
