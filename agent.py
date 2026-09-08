@@ -127,6 +127,7 @@ def is_hospital_query(message_content: str) -> bool:
         'medical', 'healthcare', 'specialist',
         'tariff', 'cost', 'charge', 'bill', 'price', 'fee', 'payment method', 'pay',
         'ceo', 'chief executive', 'director', 'management', 'leadership', 'executive',
+        'imic', 'imaging centre', 'imaging center', 'molecular imaging',
         'who is', 'who runs', 'head of', 'administrator', 'matibabu', 'saratani', 'onkolojia',
         'lipia', 'malipo',
         'kulipa', 'mpesa', 'paybill', 'kadi ya mkopo', 'gharama', 'gharamu', 'kadi',

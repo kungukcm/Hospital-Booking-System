@@ -263,6 +263,9 @@ def search_hospital_information(query: str) -> str:
             "where is", "where are", "located", "location", "situated", "iko wapi",
             "ilipo", "mahali", "anwani ya hospitali", "hospitali iko"
         ])
+        is_imic_query = any(term in query_lower for term in [
+            "imic", "imaging centre", "imaging center", "molecular imaging"
+        ])
         if "payment" in query_lower or "pay" in query_lower or "mpesa" in query_lower:
             payment_keywords = {"payment", "paybill", "credit", "card", "mpesa", "cash", "deposit"}
             strong_keywords = {"mpesa", "credit", "paybill", "payments shall be made"}
@@ -286,6 +289,16 @@ def search_hospital_information(query: str) -> str:
                 filtered.sort(key=payment_rank)
                 selected_results = filtered
         
+        # IMIC has its own site and contact details; keep those distinct from the main hospital.
+        if is_imic_query and (is_location_query or is_contact_query):
+            return (
+                "The Integrated Molecular Imaging Centre (IMIC) is located at Kahawa West, Nairobi, "
+                "along Northern Bypass Road.\n"
+                "Phone: 1558 (toll-free local) or +254 111 138106 (international).\n"
+                "Email: imagingcentre@kutrrh.go.ke\n\n"
+                "Source: https://imaging.kutrrh.go.ke/"
+            )
+
         # For CEO/leadership questions, strongly prioritize website sources over PDFs
         elif is_location_query:
             def location_rank(item):

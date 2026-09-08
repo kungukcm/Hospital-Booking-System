@@ -4,6 +4,7 @@ Initializes the hospital documentation system with PDFs and website content
 """
 
 import os
+import shutil
 from typing import List, Optional
 from hospital_tools import initialize_hospital_knowledge_base
 from logger import setup_logger
@@ -32,6 +33,9 @@ def setup_hospital_knowledge_base(
         
         # Check if vector store already exists and is valid
         vector_store_path = "hospital_vector_store"
+        if force_rebuild and os.path.exists(vector_store_path):
+            shutil.rmtree(vector_store_path)
+            logger.info("Removed existing vector store for forced rebuild")
         if os.path.exists(vector_store_path) and not force_rebuild:
             # Check if the vector store has the required index files
             if os.path.exists(os.path.join(vector_store_path, "index.faiss")):
@@ -57,6 +61,11 @@ def setup_hospital_knowledge_base(
                 "https://www.kutrrh.go.ke/about",
                 "https://www.kutrrh.go.ke/departments",
                 "https://www.kutrrh.go.ke/services",
+                "https://imaging.kutrrh.go.ke/",
+                "https://imaging.kutrrh.go.ke/about-us/",
+                "https://imaging.kutrrh.go.ke/services/",
+                "https://imaging.kutrrh.go.ke/faq/",
+                "https://imaging.kutrrh.go.ke/hospitality-centre/",
             ]
         
         # Initialize knowledge base with PDFs and websites
@@ -114,6 +123,11 @@ DEFAULT_HOSPITAL_CONFIG = {
         "https://www.kutrrh.go.ke/departments",
         "https://www.kutrrh.go.ke/services",
         "https://www.kutrrh.go.ke/contact",
+        "https://imaging.kutrrh.go.ke/",
+        "https://imaging.kutrrh.go.ke/about-us/",
+        "https://imaging.kutrrh.go.ke/services/",
+        "https://imaging.kutrrh.go.ke/faq/",
+        "https://imaging.kutrrh.go.ke/hospitality-centre/",
     ],
     "pdf_directory": "hospital_docs"
 }
