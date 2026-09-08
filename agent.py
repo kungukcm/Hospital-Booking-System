@@ -22,7 +22,6 @@ from enhanced_tools import (
     cancel_appointment,
     view_all_appointments
 )
-from hospital_tools import search_hospital_information
 
 logger = setup_logger(__name__)
 
@@ -626,6 +625,7 @@ def call_caller_model(state: AgentState) -> AgentState:
     if last_human_message and is_hospital_query(last_human_message):
         logger.info(f"Hospital query detected (priority): {last_human_message}")
         try:
+            from hospital_tools import search_hospital_information
             hospital_result = search_hospital_information.invoke({"query": last_human_message})
             logger.info(f"Hospital tool returned: {hospital_result[:100] if len(str(hospital_result)) > 100 else hospital_result}")
             if "information not available" in str(hospital_result).lower():

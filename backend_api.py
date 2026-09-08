@@ -13,13 +13,11 @@ import os
 import shutil
 
 # Import core business logic
-from agent import receive_message_from_caller
 from langchain_core.messages import HumanMessage, AIMessage
 from config import AppConfig
 from appointments_db import add_appointment, get_appointments, get_appointment
 from appointment_recommender import get_recommender
 from email_service import send_appointment_confirmation_email
-from hospital_setup import setup_hospital_knowledge_base
 from auth import authenticate_admin, verify_admin_token, create_admin_user, get_admin_users, VALID_ROLES
 from logger import setup_logger
 from feedback_store import (
@@ -255,6 +253,10 @@ async def chat(request: ChatRequest, http_request: Request):
                 else:
                     conversation.append(AIMessage(content=msg.content))
         
+        # Initialize the agent only when the first chat request arrives so the
+        # API health endpoint can bind promptly during Render startup.
+        from agent import receive_message_from_caller
+
         # Process message through agent
         receive_message_from_caller(request.message, conversation)
         
@@ -446,6 +448,7 @@ async def rebuild_knowledge_base(admin_user: str = Depends(verify_admin_auth)):
             shutil.rmtree("hospital_vector_store")
         
         # Rebuild from scratch
+        from hospital_setup import setup_hospital_knowledge_base
         result = setup_hospital_knowledge_base()
         
         if result:

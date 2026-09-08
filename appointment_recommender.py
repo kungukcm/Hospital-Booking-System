@@ -13,21 +13,24 @@ import logging
 os.environ['PYTHONHASHSEED'] = '0'
 np.random.seed(42)
 
-try:
-    from scheduling_model import SchedulingPredictor
-    _SCHEDULING_AVAILABLE = True
-except Exception as e:  # TensorFlow or model deps unavailable
-    SchedulingPredictor = None
-    _SCHEDULING_AVAILABLE = False
-    logging.getLogger(__name__).warning(
-        f"SchedulingPredictor unavailable ({e}). Appointment recommendations will use mock predictions."
-    )
+SchedulingPredictor = None
+_SCHEDULING_AVAILABLE = None
 
-try:
-    import tensorflow as tf
-    tf.random.set_seed(42)
-except Exception:
-    pass
+
+def get_scheduling_predictor():
+    """Load TensorFlow scheduling support only when recommendations are requested."""
+    global SchedulingPredictor, _SCHEDULING_AVAILABLE
+    if _SCHEDULING_AVAILABLE is None:
+        try:
+            from scheduling_model import SchedulingPredictor as predictor_class
+            SchedulingPredictor = predictor_class
+            _SCHEDULING_AVAILABLE = True
+        except Exception as e:  # TensorFlow or model deps unavailable
+            _SCHEDULING_AVAILABLE = False
+            logging.getLogger(__name__).warning(
+                f"SchedulingPredictor unavailable ({e}). Appointment recommendations will use mock predictions."
+            )
+    return SchedulingPredictor
 
 logger = logging.getLogger(__name__)
 
@@ -75,13 +78,14 @@ class AppointmentRecommender:
     
     def __init__(self, model_path: str = "models/tcn_scheduling_model.h5"):
         """Initialize with TCN scheduling model"""
-        if not _SCHEDULING_AVAILABLE:
+        predictor_class = get_scheduling_predictor()
+        if predictor_class is None:
             self.predictor = None
             self.model_loaded = False
             logger.warning("Scheduling model dependencies unavailable. Using mock predictions.")
             return
         try:
-            self.predictor = SchedulingPredictor(
+            self.predictor = predictor_class(
                 model_path=model_path,
                 framework='tensorflow'
             )
