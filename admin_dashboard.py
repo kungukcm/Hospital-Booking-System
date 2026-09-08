@@ -9,6 +9,7 @@ import requests
 import logging
 import os
 import pandas as pd
+from html import escape
 from datetime import datetime
 from urllib.parse import quote
 
@@ -94,6 +95,60 @@ def logout_admin():
     logger.info("Admin logout")
 
 
+def _report_bar_chart(title: str, values: dict) -> str:
+    """Render simple self-contained bars so downloaded reports need no external assets."""
+    if not values:
+        return f"<section><h2>{escape(title)}</h2><p>No data recorded.</p></section>"
+    maximum = max(values.values()) or 1
+    bars = "".join(
+        f'<div class="bar-row"><span>{escape(str(label))}</span>'
+        f'<div class="bar"><i style="width:{(count / maximum) * 100:.0f}%"></i></div>'
+        f'<b>{count}</b></div>'
+        for label, count in values.items()
+    )
+    return f"<section><h2>{escape(title)}</h2>{bars}</section>"
+
+
+def build_system_report_html(report: dict) -> str:
+    """Create a portable management report from the complete API snapshot."""
+    quality = report.get("chat_quality", {})
+    language = report.get("language", {})
+    appointments = report.get("appointments", {})
+    emails = report.get("email_notifications", [])
+    email_counts = {status: sum(item.get("status") == status for item in emails) for status in ("sent", "failed", "skipped")}
+    metrics = {
+        "Chats": quality.get("total_chats", 0),
+        "Flagged chats": quality.get("flagged_count", 0),
+        "Appointments": appointments.get("total", 0),
+        "Confirmed appointments": appointments.get("confirmed", 0),
+        "Feedback submissions": report.get("feedback", {}).get("total_feedback", 0),
+        "Unique visitor IPs": len(report.get("visitor_ips", [])),
+    }
+    metric_cards = "".join(f"<div class=\"metric\"><b>{value}</b><span>{escape(label)}</span></div>" for label, value in metrics.items())
+    trend = {item.get("date", "Unknown"): item.get("avg_response_time_ms", 0) for item in quality.get("performance_trend", [])}
+    language_success = {
+        "English successful": language.get("successful_responses", {}).get("english", 0),
+        "Swahili successful": language.get("successful_responses", {}).get("swahili", 0),
+    }
+    visitor_rows = "".join(
+        f"<tr><td>{escape(str(item.get('ip_address', '')))}</td><td>{escape(str(item.get('first_seen', '')))}</td><td>{escape(str(item.get('last_seen', '')))}</td><td>{item.get('hit_count', 0)}</td></tr>"
+        for item in report.get("visitor_ips", [])
+    ) or "<tr><td colspan=\"4\">No visitor IPs recorded.</td></tr>"
+    return f"""<!doctype html><html><head><meta charset=\"utf-8\"><title>System Management Report</title>
+    <style>body{{font:14px Arial,sans-serif;color:#152238;margin:36px;background:#f6f8fb}}h1{{margin-bottom:4px}}h2{{font-size:18px;margin:0 0 14px}}section{{background:#fff;padding:20px;margin:18px 0;border:1px solid #dce3ec;border-radius:6px}}.metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}.metric{{background:#eef6fb;padding:14px;border-radius:5px}}.metric b{{display:block;font-size:25px;color:#126b8d}}.metric span{{color:#526276}}.bar-row{{display:grid;grid-template-columns:190px 1fr 40px;gap:10px;align-items:center;margin:9px 0}}.bar{{height:14px;background:#edf1f6;border-radius:7px;overflow:hidden}}.bar i{{display:block;height:100%;background:#198b9b;border-radius:7px}}table{{width:100%;border-collapse:collapse}}td,th{{padding:8px;text-align:left;border-bottom:1px solid #dce3ec}}@media print{{body{{background:#fff;margin:16px}}section{{break-inside:avoid}}}}</style></head><body>
+    <h1>System Management Report</h1><p>Generated: {escape(str(report.get('generated_at', '')))}</p>
+    <section><h2>Management Summary</h2><div class=\"metrics\">{metric_cards}</div></section>
+    {_report_bar_chart('Chat Language Usage', language.get('language_counts', {}))}
+    {_report_bar_chart('Successful Responses by Language', language_success)}
+    {_report_bar_chart('Language Switches', language.get('switches', {}))}
+    {_report_bar_chart('System Performance: Average Response Time (ms) by Day', trend)}
+    {_report_bar_chart('Appointment Types', appointments.get('by_type', {}))}
+    {_report_bar_chart('Email Notification Outcomes', email_counts)}
+    <section><h2>Language Switch Rates</h2><p>English to Swahili: {language.get('switch_rate_pct', {}).get('english_to_swahili', 0)}% | Swahili to English: {language.get('switch_rate_pct', {}).get('swahili_to_english', 0)}%</p></section>
+    <section><h2>Visitor IP Addresses</h2><table><tr><th>IP address</th><th>First seen</th><th>Last seen</th><th>Hits</th></tr>{visitor_rows}</table></section>
+    </body></html>"""
+
+
 # ============================================================================
 # Login Page
 # ============================================================================
@@ -167,7 +222,7 @@ def show_admin_dashboard():
     st.divider()
     
     # Tabs for different admin functions
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
         "📊 Dashboard",
         "📅 Appointments",
         "⚙️ System",
@@ -176,7 +231,9 @@ def show_admin_dashboard():
         "💬 Chat Logs",
         "🩺 Chat Quality",
         "📧 Email Notifications",
-        "🌐 Visitor IPs"
+        "🌐 Visitor IPs",
+        "🗣️ Language Analytics",
+        "📄 Full Report"
     ])
     
     # ====================================================================
@@ -509,6 +566,63 @@ def show_admin_dashboard():
             st.dataframe(visitor_ips, use_container_width=True, hide_index=True)
         else:
             st.info("No visitor IP addresses recorded yet.")
+
+    with tab10:
+        st.subheader("🗣️ Chat Language and Success Analytics")
+        language_stats = call_backend_auth("/admin/language-stats", token=st.session_state.admin_token)
+        quality_stats = call_backend_auth("/admin/chat-quality", token=st.session_state.admin_token)
+        if language_stats:
+            counts = language_stats.get("language_counts", {})
+            successful = language_stats.get("successful_responses", {})
+            rates = language_stats.get("success_rate_pct", {})
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("English chats", counts.get("english", 0))
+            with col2:
+                st.metric("Swahili chats", counts.get("swahili", 0))
+            with col3:
+                st.metric("Successful English", successful.get("english", 0), delta=f"{rates.get('english', 0)}% success")
+            with col4:
+                st.metric("Successful Swahili", successful.get("swahili", 0), delta=f"{rates.get('swahili', 0)}% success")
+
+            st.markdown("**Chats by language**")
+            st.bar_chart(pd.DataFrame({"Chats": [counts.get("english", 0), counts.get("swahili", 0)]}, index=["English", "Swahili"]))
+            st.markdown("**Successful responses by language**")
+            st.bar_chart(pd.DataFrame({"Successful responses": [successful.get("english", 0), successful.get("swahili", 0)]}, index=["English", "Swahili"]))
+
+            switches = language_stats.get("switches", {})
+            switch_rates = language_stats.get("switch_rate_pct", {})
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("English to Swahili switches", switches.get("english_to_swahili", 0), delta=f"{switch_rates.get('english_to_swahili', 0)}% rate")
+            with col2:
+                st.metric("Swahili to English switches", switches.get("swahili_to_english", 0), delta=f"{switch_rates.get('swahili_to_english', 0)}% rate")
+
+        if quality_stats and quality_stats.get("performance_trend"):
+            st.divider()
+            st.markdown("**System performance: average chat response time by day (ms)**")
+            trend_df = pd.DataFrame(quality_stats["performance_trend"])
+            st.line_chart(trend_df.set_index("date")[["avg_response_time_ms"]])
+        elif language_stats:
+            st.info("Response-time trend will appear after timed chat records are collected.")
+
+    with tab11:
+        st.subheader("📄 Full Management Report")
+        st.caption("Generates a portable HTML report with dashboard totals, charts, performance, language, feedback, email, appointment, and visitor-IP data.")
+        report = call_backend_auth("/admin/system-report", token=st.session_state.admin_token)
+        if report:
+            st.download_button(
+                "Download Full Report (HTML)",
+                data=build_system_report_html(report),
+                file_name=f"system-management-report-{datetime.now().strftime('%Y-%m-%d')}.html",
+                mime="text/html",
+                use_container_width=True,
+            )
+            st.json({
+                "generated_at": report.get("generated_at"),
+                "system_status": report.get("system_status"),
+                "appointments": report.get("appointments"),
+            })
 
 
 # ============================================================================

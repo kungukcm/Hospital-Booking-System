@@ -18,6 +18,12 @@ ERROR_RESPONSE_MARKERS = [
     "❌ error",
 ]
 
+SWAHILI_MARKERS = {
+    "habari", "naweza", "nataka", "tafadhali", "miadi", "matibabu",
+    "hospitali", "malipo", "lipia", "huduma", "daktari", "asante",
+    "saratani", "nina", "kwa", "ya", "na", "au", "ndiyo", "hapana",
+}
+
 # Structured multiple-choice feedback questions, in submission order.
 # Column name -> (question label shown on the admin chart, legacy text-message label prefix)
 FEEDBACK_QUESTIONS = [
@@ -83,6 +89,10 @@ def initialize_store() -> None:
             ("response_time_ms", "ALTER TABLE chat_logs ADD COLUMN response_time_ms REAL"),
             ("flagged", "ALTER TABLE chat_logs ADD COLUMN flagged INTEGER NOT NULL DEFAULT 0"),
             ("flag_reason", "ALTER TABLE chat_logs ADD COLUMN flag_reason TEXT"),
+            ("language", "ALTER TABLE chat_logs ADD COLUMN language TEXT"),
+            ("response_success", "ALTER TABLE chat_logs ADD COLUMN response_success INTEGER"),
+            ("switch_from", "ALTER TABLE chat_logs ADD COLUMN switch_from TEXT"),
+            ("switch_to", "ALTER TABLE chat_logs ADD COLUMN switch_to TEXT"),
         ):
             if column not in existing_columns:
                 connection.execute(ddl)
@@ -165,23 +175,35 @@ def classify_chat_quality(assistant_response: str, response_time_ms: Optional[fl
     return ",".join(reasons) if reasons else None
 
 
+def detect_message_language(message: str) -> str:
+    """Classify a user message as Swahili or English for aggregate reporting."""
+    tokens = set((message or "").lower().replace("?", " ").replace(",", " ").split())
+    return "swahili" if tokens.intersection(SWAHILI_MARKERS) else "english"
+
+
 def log_chat(
     ip_address: str,
     user_message: str,
     assistant_response: str,
     response_time_ms: Optional[float] = None,
     flag_reason: Optional[str] = None,
+    language: Optional[str] = None,
+    switch_from: Optional[str] = None,
 ) -> None:
     initialize_store()
     if flag_reason is None:
         flag_reason = classify_chat_quality(assistant_response, response_time_ms)
     flagged = 1 if flag_reason else 0
+    language = language or detect_message_language(user_message)
+    response_success = 0 if flagged else 1
     with _connection() as connection:
         connection.execute(
             """INSERT INTO chat_logs
-               (ip_address, user_message, assistant_response, created_at, response_time_ms, flagged, flag_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (ip_address, user_message, assistant_response, _now(), response_time_ms, flagged, flag_reason),
+               (ip_address, user_message, assistant_response, created_at, response_time_ms, flagged, flag_reason,
+                language, response_success, switch_from, switch_to)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ip_address, user_message, assistant_response, _now(), response_time_ms, flagged, flag_reason,
+             language, response_success, switch_from, language if switch_from else None),
         )
     record_visitor_ip(ip_address)
 
@@ -232,6 +254,12 @@ def get_chat_quality_stats() -> Dict[str, Any]:
             """SELECT id, ip_address, user_message, assistant_response, created_at, response_time_ms, flag_reason
                FROM chat_logs WHERE flagged = 1 ORDER BY id DESC LIMIT 20"""
         ).fetchall()
+        performance_trend = connection.execute(
+            """SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS chats,
+                 ROUND(AVG(response_time_ms), 0) AS avg_response_time_ms
+               FROM chat_logs WHERE response_time_ms IS NOT NULL
+               GROUP BY substr(created_at, 1, 10) ORDER BY date"""
+        ).fetchall()
 
         return {
             "total_chats": total,
@@ -240,7 +268,67 @@ def get_chat_quality_stats() -> Dict[str, Any]:
             "avg_response_time_ms": round(avg_ms_row["avg_ms"], 0) if avg_ms_row["avg_ms"] is not None else None,
             "slow_response_count": slow,
             "recent_flagged": [dict(row) for row in recent_flagged],
+            "performance_trend": [dict(row) for row in performance_trend],
         }
+
+
+def get_language_stats() -> Dict[str, Any]:
+    """Aggregate language usage, response-success, and language-switch counts."""
+    initialize_store()
+    with _connection() as connection:
+        rows = connection.execute(
+            "SELECT user_message, language, response_success, flagged, switch_from, switch_to FROM chat_logs"
+        ).fetchall()
+
+    total = len(rows)
+    language_counts = {"english": 0, "swahili": 0}
+    successful_counts = {"english": 0, "swahili": 0}
+    switches = {"english_to_swahili": 0, "swahili_to_english": 0}
+    switch_opportunities = {"english": 0, "swahili": 0}
+
+    for row in rows:
+        language = row["language"] or detect_message_language(row["user_message"])
+        if language in language_counts:
+            language_counts[language] += 1
+            response_success = row["response_success"]
+            if response_success is None:
+                response_success = 0 if row["flagged"] else 1
+            if response_success == 1:
+                successful_counts[language] += 1
+        if row["switch_from"] in switch_opportunities:
+            switch_opportunities[row["switch_from"]] += 1
+        key = f"{row['switch_from']}_to_{row['switch_to']}"
+        if key in switches:
+            switches[key] += 1
+
+    return {
+        "total_chats": total,
+        "language_counts": language_counts,
+        "successful_responses": successful_counts,
+        "success_rate_pct": {
+            language: round((successful_counts[language] / count) * 100, 1) if count else 0.0
+            for language, count in language_counts.items()
+        },
+        "switches": switches,
+        "switch_rate_pct": {
+            "english_to_swahili": round((switches["english_to_swahili"] / switch_opportunities["english"]) * 100, 1)
+            if switch_opportunities["english"] else 0.0,
+            "swahili_to_english": round((switches["swahili_to_english"] / switch_opportunities["swahili"]) * 100, 1)
+            if switch_opportunities["swahili"] else 0.0,
+        },
+    }
+
+
+def get_system_report_data() -> Dict[str, Any]:
+    """Return a complete snapshot of management metrics for report generation."""
+    return {
+        "generated_at": _now(),
+        "chat_quality": get_chat_quality_stats(),
+        "language": get_language_stats(),
+        "feedback": get_feedback_stats(),
+        "visitor_ips": list_visitor_ips(),
+        "email_notifications": list_email_notifications(),
+    }
 
 
 def list_feedback(limit: int = 200) -> List[Dict[str, Any]]:

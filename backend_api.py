@@ -30,6 +30,9 @@ from feedback_store import (
     log_chat,
     get_chat_quality_stats,
     get_feedback_stats,
+    detect_message_language,
+    get_language_stats,
+    get_system_report_data,
     list_email_notifications,
     list_visitor_ips,
 )
@@ -59,6 +62,16 @@ def get_client_ip(http_request: Request) -> str:
     if real_ip:
         return real_ip.strip()
     return http_request.client.host if http_request.client else "unknown"
+
+
+def get_previous_user_language(conversation_history: Optional[List[Any]]) -> Optional[str]:
+    """Return the previous user message language for a per-conversation switch metric."""
+    if not conversation_history:
+        return None
+    for message in reversed(conversation_history):
+        if message.role == "user":
+            return detect_message_language(message.content)
+    return None
 
 app = FastAPI(title="KUTRRH Hospital Appointment System API", version="1.0.0")
 initialize_store()
@@ -229,6 +242,9 @@ async def chat(request: ChatRequest, http_request: Request):
         AI response and full conversation history
     """
     start_time = time.monotonic()
+    message_language = detect_message_language(request.message)
+    previous_language = get_previous_user_language(request.conversation_history)
+    switch_from = previous_language if previous_language and previous_language != message_language else None
     try:
         # Convert conversation history to langchain messages
         conversation = []
@@ -259,7 +275,14 @@ async def chat(request: ChatRequest, http_request: Request):
 
         response_time_ms = (time.monotonic() - start_time) * 1000
         client_ip = get_client_ip(http_request)
-        log_chat(client_ip, request.message, response_text, response_time_ms=response_time_ms)
+        log_chat(
+            client_ip,
+            request.message,
+            response_text,
+            response_time_ms=response_time_ms,
+            language=message_language,
+            switch_from=switch_from,
+        )
         
         logger.info(f"Chat processed successfully. Conversation length: {len(conversation)}")
         return ChatResponse(
@@ -270,7 +293,15 @@ async def chat(request: ChatRequest, http_request: Request):
     except Exception as e:
         response_time_ms = (time.monotonic() - start_time) * 1000
         client_ip = get_client_ip(http_request)
-        log_chat(client_ip, request.message, "", response_time_ms=response_time_ms, flag_reason="exception")
+        log_chat(
+            client_ip,
+            request.message,
+            "",
+            response_time_ms=response_time_ms,
+            flag_reason="exception",
+            language=message_language,
+            switch_from=switch_from,
+        )
         logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Chat processing error: {str(e)}")
 
@@ -531,6 +562,34 @@ async def admin_get_chat_logs(
 async def admin_get_chat_quality(admin_user: str = Depends(verify_admin_auth)):
     """Return chat responsiveness/hallucination metrics for the admin dashboard."""
     return get_chat_quality_stats()
+
+
+@app.get("/admin/language-stats", response_model=Dict[str, Any])
+async def admin_get_language_stats(admin_user: str = Depends(verify_admin_auth)):
+    """Return language usage, successful-response, and conversation-switch metrics."""
+    return get_language_stats()
+
+
+@app.get("/admin/system-report", response_model=Dict[str, Any])
+async def admin_get_system_report(admin_user: str = Depends(verify_admin_auth)):
+    """Return a complete management metrics snapshot for report generation."""
+    report = get_system_report_data()
+    appointments = get_appointments(limit=None)
+    report["appointments"] = {
+        "total": len(appointments),
+        "confirmed": sum(item.get("status") == "confirmed" for item in appointments),
+        "pending": sum(item.get("status") == "pending" for item in appointments),
+        "by_type": {
+            appointment_type: sum(item.get("type") == appointment_type for item in appointments)
+            for appointment_type in {item.get("type", "unknown") for item in appointments}
+        },
+    }
+    report["system_status"] = {
+        "api_status": "operational",
+        "knowledge_base_initialized": os.path.exists("hospital_vector_store"),
+        "appointment_store_initialized": os.path.exists("data/appointments.json"),
+    }
+    return report
 
 
 @app.get("/admin/email-notifications", response_model=List[Dict[str, Any]])
