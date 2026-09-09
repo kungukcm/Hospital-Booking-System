@@ -317,6 +317,8 @@ def is_cancellation_request(message_content: str) -> bool:
     if not message_content:
         return False
     text = normalize_text(message_content)
+    if re.search(r"\b(cancel|remove|delete|futa)\b.{0,30}\b(appointment|booking|miadi|uwekaji)\b", text):
+        return True
     cancel_markers = [
         "cancel appointment", "cancel booking", "cancel my appointment", "cancel this appointment",
         "cancel this booking", "cancel booking", "cancel my booking", "remove appointment",
