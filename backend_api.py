@@ -485,16 +485,18 @@ async def admin_get_all_appointments(admin_user: str = Depends(verify_admin_auth
         total = len(appointments)
         confirmed = len([a for a in appointments if a.get('status') == 'confirmed'])
         pending = len([a for a in appointments if a.get('status') == 'pending'])
-        
+        cancelled = len([a for a in appointments if a.get('status') == 'cancelled'])
+
         by_type = {}
         for apt in appointments:
             apt_type = apt.get('type', 'unknown')
             by_type[apt_type] = by_type.get(apt_type, 0) + 1
-        
+
         return {
             "total_appointments": total,
             "confirmed": confirmed,
             "pending": pending,
+            "cancelled": cancelled,
             "by_type": by_type,
             "appointments": appointments[:100],  # Return last 100 for performance
             "generated_at": datetime.now().isoformat()

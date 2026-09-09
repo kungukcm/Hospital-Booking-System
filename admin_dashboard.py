@@ -279,18 +279,21 @@ def show_admin_dashboard():
         )
         
         if apt_data:
-            col1, col2, col3, col4 = st.columns(4)
-            
+            col1, col2, col3, col4, col5 = st.columns(5)
+
             with col1:
                 st.metric("Total Appointments", apt_data.get('total_appointments', 0))
-            
+
             with col2:
                 st.metric("Confirmed", apt_data.get('confirmed', 0))
-            
+
             with col3:
                 st.metric("Pending", apt_data.get('pending', 0))
-            
+
             with col4:
+                st.metric("Cancelled", apt_data.get('cancelled', 0))
+
+            with col5:
                 st.metric("Services", len(apt_data.get('by_type', {})))
 
             feedback_data = call_backend_auth("/admin/feedback", token=st.session_state.admin_token) or []
@@ -324,7 +327,8 @@ def show_admin_dashboard():
             status_counts = {
                 "Confirmed": apt_data.get('confirmed', 0),
                 "Pending": apt_data.get('pending', 0),
-                "Other": max(0, apt_data.get('total_appointments', 0) - apt_data.get('confirmed', 0) - apt_data.get('pending', 0)),
+                "Cancelled": apt_data.get('cancelled', 0),
+                "Other": max(0, apt_data.get('total_appointments', 0) - apt_data.get('confirmed', 0) - apt_data.get('pending', 0) - apt_data.get('cancelled', 0)),
             }
             st.subheader("Appointment Status Dashboard")
             st.bar_chart(status_counts)
@@ -363,8 +367,14 @@ def show_admin_dashboard():
                             st.caption(f"📅 {apt.get('datetime', 'N/A')}")
                         
                         with col4:
-                            status_color = "🟢" if apt.get('status') == 'confirmed' else "🟡"
-                            st.caption(f"{status_color} {apt.get('status', 'N/A').upper()}")
+                            status = apt.get('status', 'N/A')
+                            if status == 'confirmed':
+                                status_color = "🟢"
+                            elif status == 'cancelled':
+                                status_color = "🔴"
+                            else:
+                                status_color = "🟡"
+                            st.caption(f"{status_color} {status.upper()}")
             else:
                 st.info("No appointments found")
     
