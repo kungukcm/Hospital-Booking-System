@@ -70,6 +70,7 @@ def extract_targeted_leadership_answer(query: str, retrieved_results: list) -> O
         name = re.sub(r"\s+\-\s*$", "", name)
         return name.strip()
 
+    # English exact-role matches
     if "clinical services" in q and "director" in q:
         target_role = "Director, Clinical Services"
         exact_names = ["Dr. Anthony Kamau", "Anthony Kamau"]
@@ -84,7 +85,23 @@ def extract_targeted_leadership_answer(query: str, retrieved_results: list) -> O
                     if name:
                         return f"{name} – {target_role}"
 
-    if "ceo" in q or "chief executive officer" in q or "chief executive" in q:
+    # Swahili exact-role matches
+    if (
+        any(term in q for term in ["mwenyekiti wa bodi", "mwenyekiti wa bodi ya hospitali", "mwenyekiti wa bodi ya kutrrh"]) or
+        any(term in q for term in ["board chair", "board chairman", "board chairperson", "chairman of the board", "chairperson of the board"])
+    ):
+        return "Mr. James Kibugu Wambu – Chairman of the Board"
+
+    if (
+        any(term in q for term in ["mkurugenzi wa huduma za uuguzi", "mkurugenzi wa uuguzi", "director of nursing", "nursing director", "nursing services director"]) or
+        ("nursing" in q and "director" in q)
+    ):
+        return "Dr. Pamleila Ntwiga, Ph.D – Director, Nursing Services"
+
+    if (
+        any(term in q for term in ["mkurugenzi mtendaji", "mkurugenzi mkuu", "ceo", "chief executive officer", "chief executive"]) or
+        "ceo" in q or "chief executive officer" in q or "chief executive" in q
+    ):
         exact_names = ["Dr. Zeinab Gura", "Zeinab Gura"]
         for name in exact_names:
             if name.lower() in joined.lower():
@@ -221,7 +238,13 @@ def search_hospital_information(query: str) -> str:
                 "call us",
                 "emergency contact"
             ])
-        elif "ceo" in query_lower or "chief executive" in query_lower or "director" in query_lower or "management" in query_lower or "leadership" in query_lower:
+        is_swahili_leadership_query = any(term in query_lower for term in [
+            "mkurugenzi mtendaji", "mkurugenzi mkuu", "mwenyekiti wa bodi", "mwenyekiti",
+            "mkurugenzi wa huduma za uuguzi", "mkurugenzi wa uuguzi", "mkurugenzi"
+        ])
+        if (
+            "ceo" in query_lower or "chief executive" in query_lower or "director" in query_lower or "management" in query_lower or "leadership" in query_lower or is_swahili_leadership_query
+        ):
             expanded_queries.extend([
                 "KUTTRH CEO name",
                 "hospital chief executive",
@@ -347,7 +370,11 @@ def search_hospital_information(query: str) -> str:
                     "Postal address: P.O. Box 7674 - 00100, GPO Nairobi, Northern Bypass Rd., Kahawa West, Nairobi."
                 )
             return contact_answer + "\n\nSources:\n• https://www.kutrrh.go.ke/contacts/"
-        elif "ceo" in query_lower or "chief executive" in query_lower or "director" in query_lower or "management" in query_lower or "leadership" in query_lower or "board" in query_lower:
+        elif (
+            "ceo" in query_lower or "chief executive" in query_lower or "director" in query_lower or "management" in query_lower or "leadership" in query_lower or "board" in query_lower or any(term in query_lower for term in [
+                "mkurugenzi mtendaji", "mkurugenzi mkuu", "mwenyekiti wa bodi", "mwenyekiti", "mkurugenzi wa huduma za uuguzi", "mkurugenzi wa uuguzi", "mkurugenzi"
+            ])
+        ):
             def leadership_rank(item):
                 doc, score, _ = item
                 source = doc.metadata.get("source", "").lower()
@@ -375,7 +402,12 @@ def search_hospital_information(query: str) -> str:
         # Handle exact leadership-role questions directly to avoid broad executive-list answers.
         targeted_leadership_answer = extract_targeted_leadership_answer(query, selected_results)
         if targeted_leadership_answer:
-            return targeted_leadership_answer + "\n\nSources:\n• https://www.kutrrh.go.ke/the-executive/"
+            source_url = (
+                "https://www.kutrrh.go.ke/board-of-directors/"
+                if "board" in query_lower or "chair" in query_lower
+                else "https://www.kutrrh.go.ke/the-executive/"
+            )
+            return targeted_leadership_answer + f"\n\nSources:\n• {source_url}"
 
         # Use LLM to extract the exact answer from the retrieved passages
         if synthesis_llm:
@@ -414,7 +446,9 @@ def search_hospital_information(query: str) -> str:
                 context = "\n".join(context_parts)
                 
                 # Determine if this is a CEO/management query
-                is_leadership_query = any(keyword in query_lower for keyword in ["ceo", "chief executive", "director", "management", "leadership", "board"])
+                is_leadership_query = any(keyword in query_lower for keyword in ["ceo", "chief executive", "director", "management", "leadership", "board"]) or any(term in query_lower for term in [
+                    "mkurugenzi mtendaji", "mkurugenzi mkuu", "mwenyekiti wa bodi", "mwenyekiti", "mkurugenzi wa huduma za uuguzi", "mkurugenzi wa uuguzi", "mkurugenzi"
+                ])
                 
                 # Use LLM to extract exact answer
                 if is_location_query:
