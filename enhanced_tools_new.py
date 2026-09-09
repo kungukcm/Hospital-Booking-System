@@ -281,15 +281,21 @@ def get_busiest_times(appointment_type: str, preferred_date: str):
 
 
 @tool
-def cancel_appointment(appointment_id: str = None, person_name: str = None, patient_id: str = None, reason: str = "Patient request"):
+def cancel_appointment(appointment_id: str = None, person_name: str = None, patient_id: str = None, reason: str = "Patient request", confirm_cancel: bool = False):
     """
     Cancel an appointment by booking ID, patient ID, or patient name.
-    Updates status in persistent database and records cancellation reason.
+    Requires explicit confirmation before the cancellation is executed.
     """
     lookup_value = (appointment_id or patient_id or person_name or "").strip()
     logger.debug(f"Attempting to cancel appointment using: {lookup_value}")
 
     try:
+        if not confirm_cancel:
+            return (
+                "⚠️ Please confirm that you want to cancel this appointment before continuing. "
+                "Reply with the same booking ID or patient ID and confirm cancellation."
+            )
+
         apt_to_cancel = None
         appointments = get_appointments()
 
@@ -308,7 +314,7 @@ def cancel_appointment(appointment_id: str = None, person_name: str = None, pati
         if not apt_to_cancel:
             return "❌ Appointment not found. Please check the booking ID or patient ID and try again."
 
-        success = db_cancel(apt_to_cancel['id'], reason)
+        success = db_cancel(apt_to_cancel['id'], reason, confirm_cancel=True)
 
         if success:
             response = (

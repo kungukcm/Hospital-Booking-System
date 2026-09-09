@@ -129,9 +129,13 @@ def get_appointment(appointment_id: str) -> Optional[Dict]:
     return None
 
 
-def cancel_appointment(appointment_id: str = None, reason: str = "") -> bool:
-    """Cancel an appointment by appointment ID or patient ID."""
+def cancel_appointment(appointment_id: str = None, reason: str = "", confirm_cancel: bool = True) -> bool:
+    """Cancel an appointment by appointment ID or patient ID after explicit confirmation."""
     ensure_db_exists()
+
+    if not confirm_cancel:
+        logger.warning("Cancellation blocked: user confirmation is required before canceling an appointment.")
+        return False
 
     if appointment_id is None or str(appointment_id).strip() == "":
         logger.warning("Cancellation called without an appointment or patient ID")

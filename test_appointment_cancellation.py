@@ -10,7 +10,7 @@ def reset_db():
         json.dump({'appointments': []}, f)
 
 
-def test_cancel_appointment_by_patient_id():
+def test_cancel_appointment_by_patient_id_requires_confirmation():
     reset_db()
     add_appointment({
         'name': 'Jane Doe',
@@ -23,8 +23,11 @@ def test_cancel_appointment_by_patient_id():
         'status': 'confirmed',
     })
 
-    cancelled = cancel_appointment('P-1001', reason='Patient request')
+    blocked = cancel_appointment('P-1001', reason='Patient request', confirm_cancel=False)
+    assert blocked is False
+    assert len(get_appointments(filter_by_status='cancelled')) == 0
 
+    cancelled = cancel_appointment('P-1001', reason='Patient request', confirm_cancel=True)
     assert cancelled is True
     appointments = get_appointments(filter_by_status='cancelled')
     assert len(appointments) == 1
