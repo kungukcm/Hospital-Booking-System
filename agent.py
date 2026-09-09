@@ -213,6 +213,103 @@ def normalize_text(text: str) -> str:
     ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
     return ascii_text.lower().strip()
 
+
+def extract_cancel_reference(messages: List[Any]) -> Dict[str, str]:
+    """Extract appointment ID, patient ID, or patient name from a cancellation flow."""
+    result = {"appointment_id": "", "patient_id": "", "person_name": ""}
+    for msg in reversed(messages):
+        if not isinstance(msg, HumanMessage):
+            continue
+        text = getattr(msg, "content", "") or ""
+        if not text:
+            continue
+
+        appointment_match = re.search(r"\bAPT_[A-Z0-9]+\b", text, re.IGNORECASE)
+        if appointment_match:
+            result["appointment_id"] = appointment_match.group(0).upper()
+
+        patient_id_match = re.search(
+            r"\b(?:patient\s*id|patient\s*no|namba\s*ya\s*mgonjwa|id\s*no|id\s*number|patient\s*number)\s*[:=]?\s*([A-Za-z0-9-]+)\b",
+            text,
+            re.IGNORECASE,
+        )
+        if patient_id_match:
+            result["patient_id"] = patient_id_match.group(1)
+        else:
+            generic_patient_id_match = re.search(r"\b[A-Z]{1,4}[-_ ]?\d{3,}\b", text)
+            if generic_patient_id_match and not result["patient_id"]:
+                result["patient_id"] = generic_patient_id_match.group(0)
+            else:
+                id_match = re.search(r"\b\d{6,}\b", text)
+                if id_match and not result["patient_id"]:
+                    result["patient_id"] = id_match.group(0)
+
+        if not result["person_name"] and re.search(r"[A-Za-z]", text):
+            possible_name = text.split(",", 1)[0].strip()
+            if len(possible_name.split()) >= 2:
+                result["person_name"] = possible_name
+
+    return result
+
+
+def is_cancellation_request(message_content: str) -> bool:
+    """Detect whether a message is specifically requesting to cancel an appointment."""
+    if not message_content:
+        return False
+    text = normalize_text(message_content)
+    cancel_markers = [
+        "cancel appointment", "cancel booking", "cancel my appointment", "cancel this appointment",
+        "cancel this booking", "cancel booking", "cancel my booking", "remove appointment",
+        "delete appointment", "cancel miadi", "futa miadi", "futa booking", "futa uwekaji wa miadi",
+        "cancel my miadi", "remove my booking", "cancel my schedule",
+    ]
+    return any(marker in text for marker in cancel_markers)
+
+
+def is_explicit_confirmation(message_content: str) -> bool:
+    """Detect explicit confirmation such as yes/confirm/proceed."""
+    if not message_content:
+        return False
+    text = normalize_text(message_content)
+    confirmation_markers = [
+        "yes", "confirm", "confirmed", "i confirm", "proceed", "continue", "go ahead",
+        "yes cancel", "cancel it", "do it", "ndiyo", "thibitisha", "endelea", "fanya",
+    ]
+    return any(marker in text for marker in confirmation_markers)
+
+
+def get_pending_cancellation_context(messages: List[Any]) -> Dict[str, Any]:
+    """Return the latest cancellation request context if the user is currently in a cancel flow."""
+    last_human_message = None
+    cancel_request_index = None
+    confirm_index = None
+    for index, msg in enumerate(messages):
+        if not isinstance(msg, HumanMessage):
+            continue
+        content = getattr(msg, "content", "") or ""
+        if not content:
+            continue
+        last_human_message = content
+        if is_cancellation_request(content):
+            cancel_request_index = index
+        if is_explicit_confirmation(content):
+            confirm_index = index
+
+    context = {
+        "cancel_requested": bool(cancel_request_index is not None),
+        "confirmed": bool(confirm_index is not None),
+        "last_human_message": last_human_message or "",
+    }
+
+    if cancel_request_index is not None:
+        # Preserve the whole cancel flow so later patient IDs / booking IDs remain available.
+        refs = extract_cancel_reference(messages[cancel_request_index:])
+    else:
+        refs = extract_cancel_reference(messages)
+    context["references"] = refs
+    return context
+
+
 def detect_appointment_type(text: str) -> str:
     """Extract appointment/service type from user text."""
     normalized = normalize_text(text)
@@ -672,6 +769,47 @@ def call_caller_model(state: AgentState) -> AgentState:
             ],
             "current_time": current_time
         }
+
+    cancellation_context = get_pending_cancellation_context(messages)
+    if cancellation_context["cancel_requested"]:
+        ref = cancellation_context["references"]
+        has_cancel_reference = bool(ref["appointment_id"] or ref["patient_id"] or ref["person_name"])
+        if not has_cancel_reference:
+            return {
+                "messages": messages + [
+                    AIMessage(content=localized_text(
+                        "To cancel an appointment, please provide the booking ID or your patient ID. After that, I will ask you to confirm before proceeding.",
+                        "Ili kufuta miadi, tafadhali toa namba ya miadi au namba ya mgonjwa. Kisha nitakuuliza uthibitisho kabla ya kuendelea.",
+                        sw_lang,
+                    ))
+                ],
+                "current_time": current_time
+            }
+
+        if not cancellation_context["confirmed"] and not is_explicit_confirmation(last_human_message or ""):
+            summary = ref["appointment_id"] or ref["patient_id"] or ref["person_name"]
+            return {
+                "messages": messages + [
+                    AIMessage(content=localized_text(
+                        f"Are you sure you want to cancel the appointment for {summary}? Please confirm by replying 'Yes' to proceed.",
+                        f"Una uhakika unataka kufuta miadi ya {summary}? Tafadhali thibitisha kwa kujibu 'Ndiyo' ili kuendelea.",
+                        sw_lang,
+                    ))
+                ],
+                "current_time": current_time
+            }
+
+        if cancellation_context["confirmed"] or is_explicit_confirmation(last_human_message or ""):
+            result = cancel_appointment.invoke({
+                "appointment_id": ref["appointment_id"],
+                "person_name": ref["person_name"],
+                "patient_id": ref["patient_id"],
+                "confirm_cancel": True,
+            })
+            return {
+                "messages": messages + [AIMessage(content=str(result))],
+                "current_time": current_time
+            }
 
     # Deterministic handling for service/date-only replies in active booking flow.
     if booking_active and last_human_message:
