@@ -214,6 +214,66 @@ def normalize_text(text: str) -> str:
     return ascii_text.lower().strip()
 
 
+def normalize_appointment_type(value: str) -> str:
+    """Normalize equivalent service names to a single canonical appointment type."""
+    if not value:
+        return ""
+
+    aliases = [
+        ("nephrologist", "Nephrology"),
+        ("nefrologia", "Nephrology"),
+        ("renal", "Nephrology"),
+        ("nephrology", "Nephrology"),
+        ("optician", "Optical"),
+        ("optometry", "Optical"),
+        ("ophthalmologist", "Optical"),
+        ("ophthalmology", "Optical"),
+        ("optical", "Optical"),
+        ("eye clinic", "Optical"),
+        ("urology", "Urology"),
+        ("urologia", "Urology"),
+        ("cardiology", "Cardiology"),
+        ("kadiolojia", "Cardiology"),
+        ("dentistry", "Dentistry"),
+        ("dentist", "Dentistry"),
+        ("dental", "Dentistry"),
+        ("mino", "Dentistry"),
+        ("general checkup", "General Check-up"),
+        ("general check-up", "General Check-up"),
+        ("checkup", "General Check-up"),
+        ("check-up", "General Check-up"),
+        ("general examination", "General Check-up"),
+        ("uchunguzi wa kawaida", "General Check-up"),
+        ("consultation", "Consultation"),
+        ("ushauri", "Consultation"),
+        ("follow up", "Follow-up"),
+        ("follow-up", "Follow-up"),
+        ("ufuatiliaji", "Follow-up"),
+        ("followup", "Follow-up"),
+        ("specialist", "Specialist"),
+        ("specialist appointment", "Specialist"),
+        ("daktari bingwa", "Specialist"),
+        ("orthopedic", "Orthopedic"),
+        ("orthopaedic", "Orthopedic"),
+        ("mifupa", "Orthopedic"),
+        ("oncology", "Oncology"),
+        ("cancer", "Oncology"),
+        ("ent", "ENT"),
+        ("ear nose throat", "ENT"),
+        ("pediatrics", "Pediatrics"),
+        ("pediatric", "Pediatrics"),
+        ("watoto", "Pediatrics"),
+    ]
+
+    normalized = normalize_text(value)
+    for alias, canonical in aliases:
+        alias_pattern = re.escape(alias)
+        if normalized == alias or re.search(rf"\b{alias_pattern}\b", normalized):
+            return canonical
+
+    return value.strip()
+
+
 def extract_cancel_reference(messages: List[Any]) -> Dict[str, str]:
     """Extract appointment ID, patient ID, or patient name from a cancellation flow."""
     result = {"appointment_id": "", "patient_id": "", "person_name": ""}
@@ -313,6 +373,9 @@ def get_pending_cancellation_context(messages: List[Any]) -> Dict[str, Any]:
 def detect_appointment_type(text: str) -> str:
     """Extract appointment/service type from user text."""
     normalized = normalize_text(text)
+    canonical = normalize_appointment_type(text)
+    if canonical and canonical != text.strip():
+        return canonical
 
     # Ignore generic booking phrases that are not actual clinical services.
     generic_booking_phrases = [
@@ -323,37 +386,44 @@ def detect_appointment_type(text: str) -> str:
     if any(phrase in normalized for phrase in generic_booking_phrases):
         # Continue below only if a known service keyword is also present.
         pass
-    service_aliases = {
-        "urology": "Urology",
-        "urologia": "Urology",
-        "cardiology": "Cardiology",
-        "kadiolojia": "Cardiology",
-        "dentistry": "Dentistry",
-        "dentist": "Dentistry",
-        "meno": "Dentistry",
-        "general checkup": "General Check-up",
-        "general check-up": "General Check-up",
-        "checkup": "General Check-up",
-        "check-up": "General Check-up",
-        "uchunguzi wa kawaida": "General Check-up",
-        "consultation": "Consultation",
-        "ushauri": "Consultation",
-        "follow up": "Follow-up",
-        "follow-up": "Follow-up",
-        "ufuatiliaji": "Follow-up",
-        "specialist": "Specialist",
-        "specialist appointment": "Specialist",
-        "daktari bingwa": "Specialist",
-        "orthopedic": "Orthopedic",
-        "mifupa": "Orthopedic",
-        "oncology": "Oncology",
-        "ent": "ENT",
-        "pediatrics": "Pediatrics",
-        "watoto": "Pediatrics",
-        "nephrology": "Nephrology",
-    }
+    service_aliases = [
+        ("nephrologist", "Nephrology"),
+        ("nefrologia", "Nephrology"),
+        ("nephrology", "Nephrology"),
+        ("optician", "Optical"),
+        ("optometry", "Optical"),
+        ("ophthalmologist", "Optical"),
+        ("ophthalmology", "Optical"),
+        ("optical", "Optical"),
+        ("urology", "Urology"),
+        ("urologia", "Urology"),
+        ("cardiology", "Cardiology"),
+        ("kadiolojia", "Cardiology"),
+        ("dentistry", "Dentistry"),
+        ("dentist", "Dentistry"),
+        ("meno", "Dentistry"),
+        ("general checkup", "General Check-up"),
+        ("general check-up", "General Check-up"),
+        ("checkup", "General Check-up"),
+        ("check-up", "General Check-up"),
+        ("uchunguzi wa kawaida", "General Check-up"),
+        ("consultation", "Consultation"),
+        ("ushauri", "Consultation"),
+        ("follow up", "Follow-up"),
+        ("follow-up", "Follow-up"),
+        ("ufuatiliaji", "Follow-up"),
+        ("specialist", "Specialist"),
+        ("specialist appointment", "Specialist"),
+        ("daktari bingwa", "Specialist"),
+        ("orthopedic", "Orthopedic"),
+        ("mifupa", "Orthopedic"),
+        ("oncology", "Oncology"),
+        ("ent", "ENT"),
+        ("pediatrics", "Pediatrics"),
+        ("watoto", "Pediatrics"),
+    ]
 
-    for alias, canonical in service_aliases.items():
+    for alias, canonical in service_aliases:
         if re.search(rf"\b{re.escape(alias)}\b", normalized):
             return canonical
 
