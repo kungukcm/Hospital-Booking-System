@@ -207,7 +207,7 @@ def check_conflict(datetime_str: str, duration_minutes: int = 30) -> Optional[Di
         return None
     
     for apt in data['appointments']:
-        if apt.get('status') == 'cancelled':
+        if apt.get('status') != 'confirmed':
             continue
         
         try:
