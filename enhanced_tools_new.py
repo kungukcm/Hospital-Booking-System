@@ -281,47 +281,50 @@ def get_busiest_times(appointment_type: str, preferred_date: str):
 
 
 @tool
-def cancel_appointment(appointment_id: str = None, person_name: str = None, reason: str = "Patient request"):
+def cancel_appointment(appointment_id: str = None, person_name: str = None, patient_id: str = None, reason: str = "Patient request"):
     """
-    Cancel an appointment by ID or patient name.
+    Cancel an appointment by booking ID, patient ID, or patient name.
     Updates status in persistent database and records cancellation reason.
     """
-    logger.debug(f"Attempting to cancel appointment: {appointment_id or person_name}")
-    
+    lookup_value = (appointment_id or patient_id or person_name or "").strip()
+    logger.debug(f"Attempting to cancel appointment using: {lookup_value}")
+
     try:
-        # Find appointment to cancel
         apt_to_cancel = None
-        
+        appointments = get_appointments()
+
         if appointment_id:
-            appointments = get_appointments()
-            apt_to_cancel = next((a for a in appointments if a['id'] == appointment_id), None)
-        
+            apt_to_cancel = next((a for a in appointments if a.get('id') == appointment_id), None)
+        elif patient_id:
+            apt_to_cancel = next((a for a in appointments if a.get('patient_id') == patient_id), None)
         elif person_name:
-            appointments = get_appointments(filter_by_status='confirmed')
-            matching = [a for a in appointments if a['name'].lower() == person_name.lower()]
+            matching = [
+                a for a in appointments
+                if a.get('name', '').lower() == person_name.lower() and a.get('status') != 'cancelled'
+            ]
             if matching:
                 apt_to_cancel = matching[0]
-        
+
         if not apt_to_cancel:
-            return f"❌ Appointment not found"
-        
-        # Cancel it
+            return "❌ Appointment not found. Please check the booking ID or patient ID and try again."
+
         success = db_cancel(apt_to_cancel['id'], reason)
-        
+
         if success:
             response = (
                 f"✅ **Appointment Cancelled**\n\n"
                 f"**Patient:** {apt_to_cancel['name']}\n"
-                f"**ID:** {apt_to_cancel['id']}\n"
+                f"**Patient ID:** {apt_to_cancel.get('patient_id', 'N/A')}\n"
+                f"**Booking ID:** {apt_to_cancel['id']}\n"
                 f"**Type:** {apt_to_cancel['type']}\n"
                 f"**Original Time:** {apt_to_cancel.get('datetime', 'N/A')}\n"
                 f"**Reason:** {reason}"
             )
             logger.info(f"✅ Cancelled: {apt_to_cancel['id']}")
             return response
-        
+
         return "❌ Failed to cancel appointment"
-        
+
     except Exception as e:
         logger.error(f"Error cancelling appointment: {e}")
         return f"❌ Error: {str(e)}"

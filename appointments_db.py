@@ -46,16 +46,19 @@ def add_appointment(appointment: Dict) -> Dict:
     with open(APPOINTMENTS_DB, 'r') as f:
         data = json.load(f)
     
+    # Check for conflicts before persisting
+    conflict = check_conflict(appointment['datetime'], appointment.get('duration_minutes', 30))
+    if conflict:
+        raise ValueError(
+            f"That time slot is already booked for {conflict.get('type', 'another appointment')}. "
+            "Please choose a different date or time."
+        )
+
     # Add metadata
     appointment['id'] = f"APT_{len(data['appointments']) + 1:04d}"
     appointment['created_at'] = datetime.now().isoformat()
     appointment['status'] = appointment.get('status', 'confirmed')
     appointment['duration_minutes'] = appointment.get('duration_minutes', 30)
-    
-    # Check for conflicts
-    conflict = check_conflict(appointment['datetime'], appointment.get('duration_minutes', 30))
-    if conflict:
-        appointment['conflict_warning'] = f"Overlaps with {conflict['name']}"
     
     # Save
     data['appointments'].append(appointment)
@@ -126,26 +129,35 @@ def get_appointment(appointment_id: str) -> Optional[Dict]:
     return None
 
 
-def cancel_appointment(appointment_id: str, reason: str = "") -> bool:
-    """Cancel an appointment"""
+def cancel_appointment(appointment_id: str = None, reason: str = "") -> bool:
+    """Cancel an appointment by appointment ID or patient ID."""
     ensure_db_exists()
-    
+
+    if appointment_id is None or str(appointment_id).strip() == "":
+        logger.warning("Cancellation called without an appointment or patient ID")
+        return False
+
+    appointment_key = str(appointment_id).strip()
+
     with open(APPOINTMENTS_DB, 'r') as f:
         data = json.load(f)
-    
+
     for apt in data['appointments']:
-        if apt['id'] == appointment_id:
+        matches_by_id = apt.get('id') == appointment_key
+        matches_by_patient_id = apt.get('patient_id') == appointment_key
+
+        if matches_by_id or matches_by_patient_id:
             apt['status'] = 'cancelled'
             apt['cancelled_at'] = datetime.now().isoformat()
             apt['cancellation_reason'] = reason
-            
+
             with open(APPOINTMENTS_DB, 'w') as f:
                 json.dump(data, f, indent=2)
-            
-            logger.info(f"Cancelled appointment: {appointment_id}")
+
+            logger.info(f"Cancelled appointment: {apt.get('id')} (lookup key: {appointment_key})")
             return True
-    
-    logger.warning(f"Appointment not found: {appointment_id}")
+
+    logger.warning(f"Appointment not found: {appointment_key}")
     return False
 
 

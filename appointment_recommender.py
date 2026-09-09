@@ -75,6 +75,31 @@ class AppointmentRecommender:
     """
     Intelligent appointment slot recommender using TCN predictions
     """
+
+    def _filter_available_slots(self, appointment_type: str, date: datetime, slots: List[Dict]) -> List[Dict]:
+        """Remove times that are already booked from a recommendation list."""
+        try:
+            from appointments_db import check_conflict
+        except Exception:
+            return slots
+
+        available_slots = []
+        for slot in slots:
+            slot_dt = slot.get('datetime')
+            if isinstance(slot_dt, str):
+                slot_dt = datetime.fromisoformat(slot_dt)
+            elif slot_dt is None:
+                try:
+                    time_value = slot.get('time', '09:00')
+                    hour, minute = [int(part) for part in time_value.split(':')]
+                    slot_dt = datetime.combine(date.date(), datetime.min.time()).replace(hour=hour, minute=minute)
+                except Exception:
+                    continue
+
+            if not check_conflict(slot_dt.isoformat(), duration_minutes=30):
+                available_slots.append(slot)
+
+        return available_slots
     
     def __init__(self, model_path: str = "models/tcn_scheduling_model.h5"):
         """Initialize with TCN scheduling model"""
@@ -173,8 +198,23 @@ class AppointmentRecommender:
         # Sort by wait time
         sorted_slots = sorted(batch, key=lambda x: x['predicted_wait_minutes'])
         
-        # Get recommendations
+        # Get recommendations and remove already booked times from the recommendations.
         recommended = sorted_slots[:num_recommendations]
+        recommended = self._filter_available_slots(appointment_type, date, recommended)
+
+        if not recommended:
+            # No free slots. Return an empty list and clear analytics for the caller to handle.
+            return [], {
+                'total_slots': 0,
+                'avg_wait_time': 0,
+                'min_wait_time': 0,
+                'max_wait_time': 0,
+                'std_dev': 0,
+                'low_congestion_slots': 0,
+                'moderate_congestion_slots': 0,
+                'high_congestion_slots': 0,
+                'availability_score': 0
+            }
         
         # Analyze congestion distribution
         analytics = self._analyze_batch(batch)
@@ -262,10 +302,10 @@ class AppointmentRecommender:
         date: datetime,
         num_slots: int = 5
     ) -> List[Dict]:
-        """Get slots with lowest predicted waiting times"""
+        """Get unbooked slots with lowest predicted waiting times."""
         batch = self.get_batch_predictions(appointment_type, date)
         sorted_slots = sorted(batch, key=lambda x: x['predicted_wait_minutes'])
-        return sorted_slots[:num_slots]
+        return self._filter_available_slots(appointment_type, date, sorted_slots)[:num_slots]
     
     def get_busiest_slots(
         self,
@@ -273,10 +313,10 @@ class AppointmentRecommender:
         date: datetime,
         num_slots: int = 5
     ) -> List[Dict]:
-        """Get slots with highest predicted waiting times (to avoid)"""
+        """Get unbooked slots with highest predicted waiting times (to avoid)."""
         batch = self.get_batch_predictions(appointment_type, date)
         sorted_slots = sorted(batch, key=lambda x: x['predicted_wait_minutes'], reverse=True)
-        return sorted_slots[:num_slots]
+        return self._filter_available_slots(appointment_type, date, sorted_slots)[:num_slots]
     
     def _analyze_batch(self, batch: List[Dict]) -> Dict:
         """Analyze congestion statistics for batch of slots"""

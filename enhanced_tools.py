@@ -53,11 +53,13 @@ def book_appointment(person_name: str, patient_id: str, phone_number: str, email
         # Categorize congestion
         congestion = CongestionCategory.categorize(wait_time)
         
-        # Check for conflicts
+        # Check for conflicts before saving to database
         conflict = check_conflict(appointment_time.isoformat(), duration_minutes=30)
-        conflict_warning = ""
         if conflict:
-            conflict_warning = f" ⚠️ Note: Overlaps with {conflict['name']}'s appointment"
+            return (
+                f"❌ This slot is already booked for {conflict.get('type', 'another appointment')}. "
+                f"Please choose a different time."
+            )
         
         # Create appointment record with patient details
         appointment_record = {
@@ -139,11 +141,26 @@ def get_optimal_appointment_slots(appointment_type: str, preferred_date: str):
             appointment_type, date_obj, num_recommendations
         )
         
+        booked_appointments = get_appointments(filter_by_date=preferred_date)
+        available_slots = []
+        for slot in slots:
+            slot_dt = slot['datetime']
+            if isinstance(slot_dt, str):
+                slot_dt = datetime.datetime.fromisoformat(slot_dt)
+            if not check_conflict(slot_dt.isoformat(), duration_minutes=30):
+                available_slots.append(slot)
+
+        if not available_slots:
+            return (
+                f"⚠️ **No available slots left for {appointment_type} on {preferred_date}.**\n"
+                f"Please choose another day or ask for alternative dates."
+            )
+
         # Build response
         response = f"🎯 **Best Available Slots for {appointment_type}**\n"
         response += f"📅 **{preferred_date}**\n\n"
         
-        for i, slot in enumerate(slots, 1):
+        for i, slot in enumerate(available_slots[:num_recommendations], 1):
             response += (
                 f"{i}. {slot['congestion_emoji']} **{slot['time']}**\n"
                 f"   {slot['congestion_color']} {slot['congestion_level']} congestion\n"
@@ -152,8 +169,9 @@ def get_optimal_appointment_slots(appointment_type: str, preferred_date: str):
             )
         
         # Add analytics
+        kept = len(available_slots)
         response += f"📊 **Daily Analytics:**\n"
-        response += f"• Available low-congestion slots: {analytics['low_congestion_slots']}/{analytics['total_slots']}\n"
+        response += f"• Available low-congestion slots: {min(kept, analytics.get('low_congestion_slots', kept))}/{max(1, analytics.get('total_slots', kept))}\n"
         response += f"• Average wait time: {analytics['avg_wait_time']} min\n"
         response += f"• Availability score: {analytics['availability_score']}%\n"
         
@@ -185,6 +203,15 @@ def suggest_alternative_slots(appointment_type: str, preferred_date: str, prefer
         result = recommender.suggest_alternatives(
             appointment_type, preferred_datetime, num_alternatives
         )
+
+        existing_slots = get_appointments(filter_by_date=preferred_datetime.strftime('%Y-%m-%d'))
+        available_alternatives = []
+        for alt in result.get('alternatives', []):
+            alt_dt = preferred_datetime.replace(hour=int(alt['time'][:2]), minute=int(alt['time'][3:]))
+            if not check_conflict(alt_dt.isoformat(), duration_minutes=30):
+                available_alternatives.append(alt)
+
+        result['alternatives'] = available_alternatives[:num_alternatives]
         
         # Build response
         response = f"🔍 **Appointment Availability Analysis**\n\n"
@@ -315,49 +342,51 @@ def get_busiest_times(appointment_type: str, preferred_date: str):
 
 
 @tool
-def cancel_appointment(appointment_id: str, person_name: str):
+def cancel_appointment(appointment_id: str = "", person_name: str = "", patient_id: str = ""):
     """
-    Cancel an appointment by providing either the appointment ID or the patient name.
-    Pass the appointment_id if known, otherwise pass the person_name.
-    Pass an empty string for the parameter you do not have.
-    """  
+    Cancel an appointment by booking ID, patient ID, or patient name.
+    Pass the value you know and leave the other fields empty.
+    """
     reason = "Patient request"
-    logger.debug(f"Attempting to cancel appointment: {appointment_id or person_name}")
-    
+    lookup_value = (appointment_id or patient_id or person_name or "").strip()
+    logger.debug(f"Attempting to cancel appointment using: {lookup_value}")
+
     try:
-        # Find appointment to cancel
         apt_to_cancel = None
-        
+        appointments = get_appointments()
+
         if appointment_id:
-            appointments = get_appointments()
-            apt_to_cancel = next((a for a in appointments if a['id'] == appointment_id), None)
-        
+            apt_to_cancel = next((a for a in appointments if a.get('id') == appointment_id), None)
+        elif patient_id:
+            apt_to_cancel = next((a for a in appointments if a.get('patient_id') == patient_id), None)
         elif person_name:
-            appointments = get_appointments(filter_by_status='confirmed')
-            matching = [a for a in appointments if a['name'].lower() == person_name.lower()]
+            matching = [
+                a for a in appointments
+                if a.get('name', '').lower() == person_name.lower() and a.get('status') != 'cancelled'
+            ]
             if matching:
                 apt_to_cancel = matching[0]
-        
+
         if not apt_to_cancel:
-            return f"❌ Appointment not found"
-        
-        # Cancel it
+            return "❌ Appointment not found. Please check the booking ID or patient ID and try again."
+
         success = db_cancel(apt_to_cancel['id'], reason)
-        
+
         if success:
             response = (
                 f"✅ **Appointment Cancelled**\n\n"
                 f"**Patient:** {apt_to_cancel['name']}\n"
-                f"**ID:** {apt_to_cancel['id']}\n"
+                f"**Patient ID:** {apt_to_cancel.get('patient_id', 'N/A')}\n"
+                f"**Booking ID:** {apt_to_cancel['id']}\n"
                 f"**Type:** {apt_to_cancel['type']}\n"
                 f"**Original Time:** {apt_to_cancel.get('datetime', 'N/A')}\n"
                 f"**Reason:** {reason}"
             )
             logger.info(f"✅ Cancelled: {apt_to_cancel['id']}")
             return response
-        
+
         return "❌ Failed to cancel appointment"
-        
+
     except Exception as e:
         logger.error(f"Error cancelling appointment: {e}")
         return f"❌ Error: {str(e)}"
