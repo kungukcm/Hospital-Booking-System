@@ -377,6 +377,88 @@ def _build_html_bar_chart(title: str, data: Dict[str, Any], colors: List[str] = 
     """
 
 
+def _build_html_pie_chart(title: str, data: Dict[str, Any], colors: List[str] = None) -> str:
+    """Generate a self-contained pie chart with percentages, labels, and a legend."""
+    values = {str(label): float(value or 0) for label, value in data.items()}
+    values = {label: value for label, value in values.items() if value > 0}
+    if not values:
+        return f'<div class="card"><h3>{escape(title)}</h3><p class="muted">No data recorded.</p></div>'
+
+    colors = colors or PALETTES["vibrant"]
+    total = sum(values.values())
+    start = 0.0
+    stops = []
+    legend_items = []
+    for index, (label, value) in enumerate(values.items()):
+        end = start + (value / total) * 360
+        color = colors[index % len(colors)]
+        stops.append(f"{color} {start:.2f}deg {end:.2f}deg")
+        percentage = (value / total) * 100
+        legend_items.append(
+            f'<div class="legend-item"><span class="legend-dot" style="background:{color}"></span>'
+            f'{escape(label)}: <b>{value:g}</b> ({percentage:.1f}%)</div>'
+        )
+        start = end
+
+    return f"""
+    <div class="card pie-card">
+        <h3>{escape(title)}</h3>
+        <div class="pie-layout">
+            <div class="pie-chart" style="background: conic-gradient({', '.join(stops)});" role="img" aria-label="{escape(title)}"></div>
+            <div class="legend-box pie-legend">{''.join(legend_items)}</div>
+        </div>
+    </div>
+    """
+
+
+def _build_html_line_chart(title: str, data: Dict[str, Any], line_color: str = "#1976D2") -> str:
+    """Generate a self-contained SVG line chart with point values and date labels."""
+    points_data = [(str(label), float(value or 0)) for label, value in data.items()]
+    if not points_data:
+        return f'<div class="card"><h3>{escape(title)}</h3><p class="muted">No data recorded.</p></div>'
+
+    width, height = 760, 300
+    left, right, top, bottom = 58, 20, 28, 62
+    plot_width = width - left - right
+    plot_height = height - top - bottom
+    maximum = max(value for _, value in points_data) or 1
+    step = plot_width / max(1, len(points_data) - 1)
+
+    coordinates = []
+    for index, (label, value) in enumerate(points_data):
+        x = left + index * step
+        y = top + plot_height - (value / maximum) * plot_height
+        coordinates.append((x, y, label, value))
+
+    polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y, _, _ in coordinates)
+    grid_lines = "".join(
+        f'<line x1="{left}" y1="{y}" x2="{width - right}" y2="{y}" stroke="#DCE3EC" stroke-width="1"/>'
+        f'<text x="{left - 8}" y="{y + 4}" text-anchor="end" class="axis-label">{maximum * ratio:.0f}</text>'
+        for ratio in (0, 0.25, 0.5, 0.75, 1)
+        for y in (top + plot_height - ratio * plot_height,)
+    )
+    markers = "".join(
+        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="#fff" stroke="{line_color}" stroke-width="3"/>'
+        f'<text x="{x:.1f}" y="{y - 10:.1f}" text-anchor="middle" class="point-label">{value:.0f}</text>'
+        f'<text x="{x:.1f}" y="{height - 25}" text-anchor="middle" class="axis-label">{escape(label[-10:])}</text>'
+        for x, y, label, value in coordinates
+    )
+
+    return f"""
+    <div class="card line-card">
+        <h3>{escape(title)}</h3>
+        <svg class="line-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{escape(title)}">
+            {grid_lines}
+            <polyline points="{polyline}" fill="none" stroke="{line_color}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+            {markers}
+            <text x="{left}" y="16" class="axis-title">Value</text>
+            <text x="{width / 2}" y="{height - 2}" text-anchor="middle" class="axis-title">Date</text>
+        </svg>
+        <div class="legend-box"><div class="legend-item"><span class="legend-dot" style="background:{line_color}"></span>{escape(title)}</div></div>
+    </div>
+    """
+
+
 def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     """Create a complete, high-quality, multi-colored management HTML report."""
     quality = report.get("chat_quality", {})
@@ -450,6 +532,16 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
         str(item.get("date", "Unknown")): item.get("error_fallbacks", 0) or 0
         for item in performance_trend
     }
+    outcome_pie_chart = _build_html_pie_chart(
+        "Chat Response Outcome & Fallback Breakdown",
+        quality_chart_data,
+        ["#2E7D32", "#D32F2F", "#F57C00", "#757575"],
+    )
+    performance_line_chart = _build_html_line_chart(
+        "System Performance: Average Response Time by Day (ms)",
+        performance_chart,
+        "#1976D2",
+    )
     latency_values = [item.get("avg_response_time_ms") for item in performance_trend if item.get("avg_response_time_ms") is not None]
     performance_summary = (
         f"<p><b>Average response time:</b> {avg_latency:.0f} ms "
@@ -479,6 +571,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
         <h2>⚙️ System Performance Analytics</h2>
         {performance_summary}
         <p class="muted">Daily averages and fallback counts are based on timed chat records stored by the system.</p>
+        {performance_line_chart}
         <div class="grid-2">
             {_build_html_bar_chart('Average Response Time by Day (ms)', performance_chart, ['#1976D2', '#0097A7', '#7B1FA2'])}
             {_build_html_bar_chart('Error / Fallback Responses by Day', performance_error_chart, ['#D32F2F', '#F57C00', '#C2185B'])}
@@ -736,6 +829,13 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     }}
     .legend-item {{ display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }}
     .legend-dot {{ width: 10px; height: 10px; border-radius: 50%; display: inline-block; }}
+    .pie-layout {{ display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap; }}
+    .pie-chart {{ width: 220px; height: 220px; border-radius: 50%; border: 8px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,.12); }}
+    .pie-legend {{ display: grid; gap: 8px; border-top: 0; margin-top: 0; padding-top: 0; }}
+    .line-chart {{ width: 100%; height: auto; min-height: 250px; overflow: visible; }}
+    .axis-label {{ fill: #607289; font-size: 11px; }}
+    .axis-title {{ fill: #526276; font-size: 12px; font-weight: 600; }}
+    .point-label {{ fill: #152238; font-size: 11px; font-weight: 700; }}
     table {{
         width: 100%;
         border-collapse: collapse;
@@ -830,7 +930,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
 
 <!-- SECTION 1: CHAT QUALITY & RESOLUTION VISUALIZATIONS -->
 <div class="grid-2">
-    {_build_html_bar_chart('Chat Quality & Resolution Breakdown', quality_chart_data, ['#2E7D32', '#D32F2F', '#F57C00', '#757575'])}
+    {outcome_pie_chart}
     {_build_html_bar_chart('Response Latency Distribution', quality.get('latency_distribution', {}), ['#2E7D32', '#1976D2', '#F57C00', '#D32F2F'])}
 </div>
 
