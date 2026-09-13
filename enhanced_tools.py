@@ -8,58 +8,20 @@ import datetime
 import streamlit as st
 from logger import setup_logger
 from config import AppConfig
-from appointments_db import add_appointment, cancel_appointment as db_cancel, get_appointments, check_conflict, get_appointment_stats, get_next_appointment as get_next_apt_db
+from appointments_db import (
+    add_appointment,
+    cancel_appointment as db_cancel,
+    get_appointments,
+    check_conflict,
+    get_appointment_stats,
+    get_next_appointment as get_next_apt_db,
+    normalize_appointment_type
+)
 from appointment_recommender import get_recommender, CongestionCategory
 from email_service import send_appointment_confirmation_email
 
 logger = setup_logger(__name__)
 config = AppConfig()
-
-
-def normalize_appointment_type(value: str) -> str:
-    """Normalize equivalent service names to a single canonical appointment type."""
-    if not value:
-        return ""
-
-    aliases = [
-        ("nephrologist", "Nephrology"),
-        ("nefrologia", "Nephrology"),
-        ("nephrology", "Nephrology"),
-        ("optician", "Optical"),
-        ("optometry", "Optical"),
-        ("ophthalmologist", "Optical"),
-        ("ophthalmology", "Optical"),
-        ("optical", "Optical"),
-        ("eye clinic", "Optical"),
-        ("urology", "Urology"),
-        ("urologia", "Urology"),
-        ("cardiology", "Cardiology"),
-        ("kadiolojia", "Cardiology"),
-        ("dentistry", "Dentistry"),
-        ("dentist", "Dentistry"),
-        ("dental", "Dentistry"),
-        ("general checkup", "General Check-up"),
-        ("general check-up", "General Check-up"),
-        ("checkup", "General Check-up"),
-        ("check-up", "General Check-up"),
-        ("consultation", "Consultation"),
-        ("ushauri", "Consultation"),
-        ("follow up", "Follow-up"),
-        ("follow-up", "Follow-up"),
-        ("ufuatiliaji", "Follow-up"),
-        ("specialist", "Specialist"),
-        ("orthopedic", "Orthopedic"),
-        ("orthopaedic", "Orthopedic"),
-        ("oncology", "Oncology"),
-        ("ent", "ENT"),
-        ("pediatrics", "Pediatrics"),
-    ]
-
-    normalized = value.strip().lower().replace("_", " ")
-    for alias, canonical in aliases:
-        if normalized == alias or alias in normalized:
-            return canonical
-    return value.strip()
 
 
 @tool

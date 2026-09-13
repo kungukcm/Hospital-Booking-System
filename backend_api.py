@@ -15,7 +15,7 @@ import shutil
 # Import core business logic
 from langchain_core.messages import HumanMessage, AIMessage
 from config import AppConfig
-from appointments_db import add_appointment, get_appointments, get_appointment
+from appointments_db import add_appointment, get_appointments, get_appointment, normalize_appointment_type
 from appointment_recommender import get_recommender
 from email_service import send_appointment_confirmation_email
 from auth import authenticate_admin, verify_admin_token, create_admin_user, get_admin_users, VALID_ROLES
@@ -489,7 +489,7 @@ async def admin_get_all_appointments(admin_user: str = Depends(verify_admin_auth
 
         by_type = {}
         for apt in appointments:
-            apt_type = apt.get('type', 'unknown')
+            apt_type = normalize_appointment_type(apt.get('type', 'Unknown')) or 'General Check-up'
             by_type[apt_type] = by_type.get(apt_type, 0) + 1
 
         return {
@@ -580,14 +580,16 @@ async def admin_get_system_report(admin_user: str = Depends(verify_admin_auth)):
     """Return a complete management metrics snapshot for report generation."""
     report = get_system_report_data()
     appointments = get_appointments(limit=None)
+    normalized_types = [normalize_appointment_type(item.get("type", "Unknown")) or "General Check-up" for item in appointments]
+    unique_types = sorted(list(set(normalized_types)))
     report["appointments"] = {
         "total": len(appointments),
         "confirmed": sum(item.get("status") == "confirmed" for item in appointments),
         "pending": sum(item.get("status") == "pending" for item in appointments),
         "cancelled": sum(item.get("status") == "cancelled" for item in appointments),
         "by_type": {
-            appointment_type: sum(item.get("type") == appointment_type for item in appointments)
-            for appointment_type in {item.get("type", "unknown") for item in appointments}
+            appointment_type: sum(t == appointment_type for t in normalized_types)
+            for appointment_type in unique_types
         },
         "all_appointments": appointments,
     }

@@ -11,6 +11,7 @@ import unicodedata
 from config import AppConfig
 from constants import GROQ_API_KEY
 from logger import setup_logger
+from appointments_db import normalize_appointment_type
 from enhanced_tools import (
     book_appointment,
     get_next_available_appointment,
@@ -374,64 +375,24 @@ def get_pending_cancellation_context(messages: List[Any]) -> Dict[str, Any]:
 
 def detect_appointment_type(text: str) -> str:
     """Extract appointment/service type from user text."""
+    if not text:
+        return ""
     normalized = normalize_text(text)
     canonical = normalize_appointment_type(text)
-    if canonical and canonical != text.strip():
+    if canonical and canonical.lower() != normalized:
         return canonical
 
-    # Ignore generic booking phrases that are not actual clinical services.
+    # If the message is only a generic booking phrase, do not treat it as a service.
     generic_booking_phrases = [
         "naomba kupanga miadi", "panga miadi", "naomba miadi", "miadi",
         "book appointment", "book an appointment", "appointment",
         "schedule appointment", "need appointment", "nataka miadi"
     ]
-    if any(phrase in normalized for phrase in generic_booking_phrases):
-        # Continue below only if a known service keyword is also present.
-        pass
-    service_aliases = [
-        ("nephrologist", "Nephrology"),
-        ("nefrologia", "Nephrology"),
-        ("nephrology", "Nephrology"),
-        ("optician", "Optical"),
-        ("optometry", "Optical"),
-        ("ophthalmologist", "Optical"),
-        ("ophthalmology", "Optical"),
-        ("optical", "Optical"),
-        ("urology", "Urology"),
-        ("urologia", "Urology"),
-        ("cardiology", "Cardiology"),
-        ("kadiolojia", "Cardiology"),
-        ("dentistry", "Dentistry"),
-        ("dentist", "Dentistry"),
-        ("meno", "Dentistry"),
-        ("general checkup", "General Check-up"),
-        ("general check-up", "General Check-up"),
-        ("checkup", "General Check-up"),
-        ("check-up", "General Check-up"),
-        ("uchunguzi wa kawaida", "General Check-up"),
-        ("consultation", "Consultation"),
-        ("ushauri", "Consultation"),
-        ("follow up", "Follow-up"),
-        ("follow-up", "Follow-up"),
-        ("ufuatiliaji", "Follow-up"),
-        ("specialist", "Specialist"),
-        ("specialist appointment", "Specialist"),
-        ("daktari bingwa", "Specialist"),
-        ("orthopedic", "Orthopedic"),
-        ("mifupa", "Orthopedic"),
-        ("oncology", "Oncology"),
-        ("ent", "ENT"),
-        ("pediatrics", "Pediatrics"),
-        ("watoto", "Pediatrics"),
-    ]
-
-    for alias, canonical in service_aliases:
-        if re.search(rf"\b{re.escape(alias)}\b", normalized):
-            return canonical
-
-    # If the message is only a generic booking phrase, do not treat it as a service.
     if any(phrase == normalized for phrase in generic_booking_phrases):
         return ""
+
+    if canonical:
+        return canonical
 
     # If user enters a short service-only phrase, use it as provided.
     generic_tokens = {
@@ -444,7 +405,7 @@ def detect_appointment_type(text: str) -> str:
         and re.fullmatch(r"[a-z\s-]+", normalized)
         and any(t not in generic_tokens for t in tokens)
     ):
-        return text.strip().title()
+        return normalize_appointment_type(text.strip().title())
 
     return ""
 

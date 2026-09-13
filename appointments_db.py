@@ -5,6 +5,8 @@ Handles persistent storage, retrieval, and management of appointments
 
 import json
 import os
+import re
+import unicodedata
 from datetime import datetime
 from typing import List, Dict, Optional
 import logging
@@ -12,6 +14,60 @@ import logging
 logger = logging.getLogger(__name__)
 
 APPOINTMENTS_DB = "data/appointments.json"
+
+
+def normalize_appointment_type(value: str) -> str:
+    """Normalize equivalent service names, roles, and spelling variations to a canonical specialty."""
+    if not value or not isinstance(value, str):
+        return ""
+
+    aliases = [
+        # Gynaecology / Obstetrics (gynaecology, gynaecologist, gynecology, gynecologist, gaenacology, gaenacologist, gynae, obgyn, obstetrics)
+        (r'\b(g[ya]?[eaiou]*n[aeiou]*colo?g(?:ist|y|ic|a)?|gyna?e|gyne|ob-?gyn|obstetric(?:s|ian)?|uzazi|wanawake)\b', 'Gynaecology'),
+        # Nephrology / Renal
+        (r'\b(nephrolo?g(?:ist|y|ic|a)?|nefrolog(?:ist|y|ia|a)?|renal|figo)\b', 'Nephrology'),
+        # Optical / Eye / Ophthalmology
+        (r'\b(optici?an|optometr(?:y|ist)?|ophthalmolo?g(?:ist|y|ic|a)?|optical|eye clinic|macho)\b', 'Optical'),
+        # Urology
+        (r'\b(urolo?g(?:ist|y|ic|ia|a)?|mkojo)\b', 'Urology'),
+        # Cardiology
+        (r'\b(cardiolo?g(?:ist|y|ic|a)?|kadiolojia|heart|moyo)\b', 'Cardiology'),
+        # Dentistry / Dental
+        (r'\b(dentist(?:ry)?|dental|mino|meno)\b', 'Dentistry'),
+        # Oncology / Cancer
+        (r'\b(oncolo?g(?:ist|y|ic|a)?|cancer|saratani)\b', 'Oncology'),
+        # Orthopedic / Orthopaedics
+        (r'\b(orthop[ae]edic(?:s)?|orthop[ae]edist|orthop[ae]dic(?:s)?|orthop[ae]dist|mifupa)\b', 'Orthopedic'),
+        # ENT / Otolaryngology
+        (r'\b(ent|ear nose throat|otorhinolaryngology|masikio|pua na koo)\b', 'ENT'),
+        # Pediatrics / Paediatrics
+        (r'\b(p[ae]ediatric(?:s|ian)?|p[ae]diatric(?:s|ian)?|watoto)\b', 'Pediatrics'),
+        # Dermatology
+        (r'\b(dermatolo?g(?:ist|y|ic|a)?|skin|ngozi)\b', 'Dermatology'),
+        # Neurology
+        (r'\b(neurolo?g(?:ist|y|ic|a)?|neurosurg(?:ery|eon)?|ubongo)\b', 'Neurology'),
+        # Psychiatry
+        (r'\b(psychiatr(?:y|ist)|psycholo?g(?:y|ist)|mental health|afya ya akili)\b', 'Psychiatry'),
+        # Radiology
+        (r'\b(radiolo?g(?:ist|y|ic|a)?|x-?ray|ct scan|mri|ultrasound)\b', 'Radiology'),
+        # General Checkup
+        (r'\b(general check-?up|general examination|check-?up|checkup|uchunguzi wa kawaida|general practice|gp)\b', 'General Check-up'),
+        # Consultation
+        (r'\b(consultation|ushauri)\b', 'Consultation'),
+        # Follow up
+        (r'\b(follow-?up|ufuatiliaji)\b', 'Follow-up'),
+        # Specialist
+        (r'\b(specialist(?: appointment)?|daktari bingwa)\b', 'Specialist'),
+    ]
+
+    normalized = unicodedata.normalize('NFKD', value)
+    ascii_text = ''.join(ch for ch in normalized if not unicodedata.combining(ch)).lower().strip().replace('_', ' ')
+
+    for pattern, canonical in aliases:
+        if re.search(pattern, ascii_text):
+            return canonical
+
+    return value.strip()
 
 
 def ensure_db_exists():
@@ -42,6 +98,9 @@ def add_appointment(appointment: Dict) -> Dict:
         if field not in appointment:
             raise ValueError(f"Missing required field: {field}")
     
+    # Normalize appointment type
+    appointment['type'] = normalize_appointment_type(appointment.get('type', '')) or appointment.get('type', '')
+
     # Load existing appointments
     with open(APPOINTMENTS_DB, 'r') as f:
         data = json.load(f)
@@ -98,7 +157,12 @@ def get_appointments(
         appointments = [a for a in appointments if a.get('status') == filter_by_status]
     
     if filter_by_type:
-        appointments = [a for a in appointments if a.get('type', '').lower() == filter_by_type.lower()]
+        target_type = normalize_appointment_type(filter_by_type).lower()
+        appointments = [
+            a for a in appointments
+            if (normalize_appointment_type(a.get('type', '')).lower() == target_type or
+                a.get('type', '').lower() == filter_by_type.lower())
+        ]
     
     if filter_by_date:
         appointments = [a for a in appointments if a.get('datetime', '').startswith(filter_by_date)]
@@ -245,7 +309,7 @@ def get_appointment_stats() -> Dict:
     
     for apt in appointments:
         # Count by type
-        apt_type = apt.get('type', 'Unknown')
+        apt_type = normalize_appointment_type(apt.get('type', 'Unknown')) or 'General Check-up'
         stats['by_type'][apt_type] = stats['by_type'].get(apt_type, 0) + 1
         
         # Average wait time

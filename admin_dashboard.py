@@ -15,6 +15,7 @@ from html import escape
 from datetime import datetime
 from urllib.parse import quote
 from typing import Any, Dict, List, Optional
+from appointments_db import normalize_appointment_type
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -388,6 +389,18 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
         "Skipped (No SMTP)": sum(item.get("status") == "skipped" for item in emails),
     }
 
+    # Group appointments by normalized canonical specialty
+    normalized_by_type = {}
+    if all_appointments:
+        for apt in all_appointments:
+            canon = normalize_appointment_type(apt.get('type', 'Unknown')) or "General Check-up"
+            normalized_by_type[canon] = normalized_by_type.get(canon, 0) + 1
+    else:
+        for k, v in appointments_meta.get('by_type', {}).items():
+            canon = normalize_appointment_type(k) or "General Check-up"
+            normalized_by_type[canon] = normalized_by_type.get(canon, 0) + v
+
+    # Appointment status counts
     apt_status_counts = {
         "Confirmed Bookings": sum(item.get("status") == "confirmed" for item in all_appointments),
         "Pending Bookings": sum(item.get("status") == "pending" for item in all_appointments),
@@ -698,7 +711,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
 
 <!-- SECTION 2: APPOINTMENTS & SERVICES VISUALIZATIONS -->
 <div class="grid-2">
-    {_build_html_bar_chart('Appointments by Service Specialty', appointments_meta.get('by_type', {}), PALETTES['vibrant'])}
+    {_build_html_bar_chart('Appointments by Service Specialty', normalized_by_type, PALETTES['vibrant'])}
     {_build_html_bar_chart('Appointment Status Distribution', apt_status_counts, ['#2E7D32', '#F57C00', '#D32F2F'])}
 </div>
 
@@ -928,6 +941,12 @@ def show_admin_dashboard():
         feedback_data = call_backend_auth("/admin/feedback", token=st.session_state.admin_token) or []
         chat_data = call_backend_auth("/admin/chat-logs", token=st.session_state.admin_token) or []
         
+        raw_by_type = apt_data.get('by_type', {})
+        by_type = {}
+        for k, v in raw_by_type.items():
+            canon = normalize_appointment_type(k) or "General Check-up"
+            by_type[canon] = by_type.get(canon, 0) + v
+
         # Top KPI Metrics Cards
         kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns(5)
         with kpi_col1:
@@ -939,7 +958,7 @@ def show_admin_dashboard():
         with kpi_col4:
             st.metric("Cancelled Bookings", apt_data.get('cancelled', 0), delta="🔴 Cancelled")
         with kpi_col5:
-            st.metric("Clinical Specialties", len(apt_data.get('by_type', {})))
+            st.metric("Clinical Specialties", len(by_type))
 
         st.divider()
         m_col1, m_col2, m_col3, m_col4 = st.columns(4)
