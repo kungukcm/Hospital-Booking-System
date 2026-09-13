@@ -51,7 +51,7 @@ def normalize_appointment_type(value: str) -> str:
         # Radiology
         (r'\b(radiolo?g(?:ist|y|ic|a)?|x-?ray|ct scan|mri|ultrasound)\b', 'Radiology'),
         # General Checkup
-        (r'\b(general check-?up|general examination|check-?up|checkup|uchunguzi wa kawaida|general practice|gp)\b', 'General Check-up'),
+        (r'\b(general check[ -]?up|general examination|check[ -]?up|uchunguzi wa kawaida|general practice|gp)\b', 'General Check-up'),
         # Consultation
         (r'\b(consultation|ushauri)\b', 'Consultation'),
         # Follow up
