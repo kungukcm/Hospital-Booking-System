@@ -387,6 +387,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     visitor_ips = report.get("visitor_ips", [])
     emails = report.get("email_notifications", [])
     system_status = report.get("system_status", {})
+    feedback_stats = report.get("feedback", {})
 
     total_chats = quality.get("total_chats", 0)
     successful_chats = quality.get("successful_count", max(0, total_chats - quality.get("flagged_count", 0)))
@@ -426,6 +427,59 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
         "Slow Responses (>8s)": slow_chats,
         "Empty Responses": quality.get("empty_response_count", 0),
     }
+
+    feedback_charts = ""
+    for question in feedback_stats.get("questions", []):
+        counts = question.get("counts") or {}
+        if counts:
+            feedback_charts += _build_html_bar_chart(
+                question.get("label", question.get("column", "Feedback question")),
+                counts,
+                PALETTES["vibrant"],
+            )
+    effort_distribution = feedback_stats.get("natural_effort_distribution") or {}
+    if effort_distribution:
+        feedback_charts += _build_html_bar_chart(
+            "Natural / Low-Effort Rating Distribution (1 = Difficult, 5 = Effortless)",
+            {f"Score {key}": value for key, value in effort_distribution.items()},
+            PALETTES["quality"],
+        )
+    rating_values = []
+    for record in feedback_records:
+        try:
+            rating_values.append(int(record.get("rating")))
+        except (TypeError, ValueError):
+            continue
+    rating_distribution = {
+        f"Rating {rating}": rating_values.count(rating)
+        for rating in range(1, 6)
+        if rating_values.count(rating)
+    }
+    if rating_distribution:
+        feedback_charts += _build_html_bar_chart(
+            "Overall Feedback Rating Distribution (1-5)",
+            rating_distribution,
+            PALETTES["quality"],
+        )
+    average_effort = feedback_stats.get("avg_natural_effort")
+    average_rating = sum(rating_values) / len(rating_values) if rating_values else None
+    feedback_summary = (
+        f"<p><b>Total submissions:</b> {feedback_stats.get('total_feedback', len(feedback_records))} "
+        f"| <b>Average rating:</b> {average_rating:.2f} / 5 "
+        f"| <b>Average effort rating:</b> {average_effort:.2f} / 5</p>"
+        if average_effort is not None
+        else f"<p><b>Total submissions:</b> {feedback_stats.get('total_feedback', len(feedback_records))}"
+        f" | <b>Average rating:</b> {average_rating:.2f} / 5</p>" if average_rating is not None
+        else f"<p><b>Total submissions:</b> {feedback_stats.get('total_feedback', len(feedback_records))}</p>"
+    )
+    feedback_analytics = f"""
+    <div class="card">
+        <h2>📊 Feedback Statistics & Visual Analysis</h2>
+        {feedback_summary}
+        <p class="muted">Each bar includes its response count and percentage of responses for that question. Colors identify answer categories in the legend.</p>
+        <div class="grid-2">{feedback_charts or '<p class="muted">No structured feedback statistics recorded.</p>'}</div>
+    </div>
+    """
 
     apt_rows = ""
     if all_appointments:
@@ -734,7 +788,10 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     {_build_html_bar_chart('Email Confirmation Delivery Status', email_counts, ['#2E7D32', '#D32F2F', '#757575'])}
 </div>
 
-<!-- SECTION 4: COMPLETE APPOINTMENTS TABLE (ALL BOOKED, PENDING, CANCELLED) -->
+<!-- SECTION 4: FEEDBACK STATISTICS & VISUAL ANALYSIS -->
+{feedback_analytics}
+
+<!-- SECTION 5: COMPLETE APPOINTMENTS TABLE (ALL BOOKED, PENDING, CANCELLED) -->
 <div class="card">
     <h2>📅 Complete Appointments Record (Booked, Pending & Cancelled)</h2>
     <p class="muted">All appointment bookings stored in the hospital scheduling database with current status and patient references.</p>
@@ -759,7 +816,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     </div>
 </div>
 
-<!-- SECTION 5: VISITOR IP AUDIT LOG -->
+<!-- SECTION 6: VISITOR IP AUDIT LOG -->
 <div class="card">
     <h2>🌐 Unique Visitor IP Audit Trail</h2>
     <p class="muted">Audited client IP addresses tracking platform interaction frequency and engagement timestamps.</p>
@@ -780,7 +837,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     </div>
 </div>
 
-<!-- SECTION 6: USER FEEDBACK & EVALUATION RECORDS -->
+<!-- SECTION 7: USER FEEDBACK & EVALUATION RECORDS -->
 <div class="card">
     <h2>📝 User Evaluation & Feedback Records</h2>
     <p class="muted">Structured patient feedback responses evaluating usability, accuracy, queue utility, and satisfaction.</p>
@@ -805,7 +862,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     </div>
 </div>
 
-<!-- SECTION 7: EMAIL NOTIFICATION AUDIT -->
+<!-- SECTION 8: EMAIL NOTIFICATION AUDIT -->
 <div class="card">
     <h2>📧 Patient Email Confirmation Delivery Logs</h2>
     <div style="overflow-x: auto;">
