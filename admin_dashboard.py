@@ -163,11 +163,13 @@ def render_colored_bar_chart(
 
     legend_title = legend_title or category_col
     categories = [str(value) for value in df[category_col].tolist()]
-    color_scale = alt.Scale(
-        domain=categories,
-        range=PALETTES["vibrant"][:len(categories)] if len(categories) <= len(PALETTES["vibrant"]) else None,
-        scheme=None if len(categories) <= len(PALETTES["vibrant"]) else color_scheme,
-    )
+    if len(categories) <= len(PALETTES["vibrant"]):
+        color_scale = alt.Scale(
+            domain=categories,
+            range=PALETTES["vibrant"][:len(categories)],
+        )
+    else:
+        color_scale = alt.Scale(domain=categories, scheme=color_scheme)
     if horizontal:
         bars = alt.Chart(df).mark_bar(cornerRadiusTopRight=6, cornerRadiusBottomRight=6).encode(
             y=alt.Y(f"{category_col}:N", sort='-x', title=y_label or category_col, axis=alt.Axis(labelLimit=0, labelOverlap=False)),
