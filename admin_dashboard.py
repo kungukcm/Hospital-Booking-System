@@ -1065,28 +1065,146 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
 
 
 def build_system_report_pdf(report: dict, mask_pii: bool = True) -> bytes:
-    """Convert the complete HTML report to a downloadable PDF."""
+    """Build a robust multi-page PDF report without HTML table layout limits."""
     try:
-        from xhtml2pdf import pisa
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.platypus import (
+            PageBreak,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
     except ImportError as exc:
         raise RuntimeError(
-            "PDF export is unavailable because xhtml2pdf is not installed. "
+            "PDF export is unavailable because reportlab is not installed. "
             "Install the dependencies from requirements.txt."
         ) from exc
 
     from io import BytesIO
     output = BytesIO()
-    result = pisa.CreatePDF(
-        src=build_system_report_html(report, mask_pii=mask_pii),
-        dest=output,
-        encoding="utf-8",
+    page_width, page_height = landscape(A4)
+    document = SimpleDocTemplate(
+        output,
+        pagesize=(page_width, page_height),
+        rightMargin=12 * mm,
+        leftMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
     )
-    pdf_bytes = output.getvalue()
-    if result.err and not pdf_bytes.startswith(b"%PDF-"):
-        raise RuntimeError(f"PDF export failed with {result.err} conversion error(s).")
-    if result.err:
-        logger.warning("PDF export completed with %s non-fatal layout warning(s)", result.err)
-    return pdf_bytes
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="ReportTitle", parent=styles["Title"], alignment=TA_CENTER, textColor=colors.HexColor("#1976D2"), fontSize=18, leading=22))
+    styles.add(ParagraphStyle(name="SectionTitle", parent=styles["Heading2"], textColor=colors.HexColor("#152238"), spaceBefore=8, spaceAfter=6))
+    styles.add(ParagraphStyle(name="Small", parent=styles["BodyText"], fontSize=7, leading=9))
+    styles.add(ParagraphStyle(name="Metric", parent=styles["BodyText"], fontSize=9, leading=11))
+
+    def paragraph(value: Any, style="Small"):
+        return Paragraph(str(value or "-").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"), styles[style])
+
+    def statistic_table(title: str, values: Dict[str, Any]):
+        rows = [[paragraph(label, "Small"), paragraph(value, "Metric")] for label, value in values.items()]
+        table = Table(rows, colWidths=[58 * mm, 32 * mm], repeatRows=0)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E3F2FD")),
+            ("BACKGROUND", (1, 0), (1, -1), colors.white),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#B0BEC5")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CFD8DC")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        return [Paragraph(title, styles["SectionTitle"]), table, Spacer(1, 5 * mm)]
+
+    quality = report.get("chat_quality", {})
+    language = report.get("language", {})
+    feedback = report.get("feedback", {})
+    appointments = report.get("appointments", {})
+    all_appointments = appointments.get("all_appointments", [])
+    feedback_records = report.get("feedback_records", [])
+    visitor_ips = report.get("visitor_ips", [])
+    email_notifications = report.get("email_notifications", [])
+    total_chats = _safe_number(quality.get("total_chats"))
+    error_count = _safe_number(quality.get("error_fallback_count"))
+    slow_count = _safe_number(quality.get("slow_response_count"))
+
+    story = [
+        Paragraph("KUTRRH System Management Report", styles["ReportTitle"]),
+        paragraph(f"Generated: {report.get('generated_at', datetime.now().isoformat())}", "Metric"),
+        Spacer(1, 4 * mm),
+    ]
+    story += statistic_table("Executive Summary", {
+        "Total chat sessions": int(total_chats),
+        "Successful chats": quality.get("successful_count", max(0, int(total_chats) - int(quality.get("flagged_count", 0) or 0))),
+        "Error/fallback chats": f"{int(error_count)} ({quality.get('error_fallback_rate_pct', 0)}%)",
+        "Slow responses (>8s)": f"{int(slow_count)} ({quality.get('slow_response_rate_pct', 0)}%)",
+        "Average response time": f"{_safe_number(quality.get('avg_response_time_ms')):.0f} ms",
+        "Total appointments": len(all_appointments),
+        "Confirmed / pending / cancelled": f"{appointments.get('confirmed', 0)} / {appointments.get('pending', 0)} / {appointments.get('cancelled', 0)}",
+        "Feedback submissions": len(feedback_records),
+        "Unique visitor IPs": len(visitor_ips),
+    })
+    story += statistic_table("Language Analytics", {
+        "English chats": language.get("language_counts", {}).get("english", 0),
+        "Swahili chats": language.get("language_counts", {}).get("swahili", 0),
+        "English success rate": f"{language.get('success_rate_pct', {}).get('english', 0)}%",
+        "Swahili success rate": f"{language.get('success_rate_pct', {}).get('swahili', 0)}%",
+        "English to Swahili switches": language.get("switches", {}).get("english_to_swahili", 0),
+        "Swahili to English switches": language.get("switches", {}).get("swahili_to_english", 0),
+    })
+    story += statistic_table("Feedback Statistics", {
+        "Total submissions": feedback.get("total_feedback", len(feedback_records)),
+        "Average effort rating": feedback.get("avg_natural_effort") or "N/A",
+        "Overall ratings recorded": len([row for row in feedback_records if row.get("rating") is not None]),
+    })
+
+    story.append(PageBreak())
+    story.append(Paragraph("Complete Appointments Register", styles["SectionTitle"]))
+    appointment_rows = [[paragraph(header, "Metric") for header in ["Booking ID", "Patient", "Specialty", "Date/Time", "Status", "Phone", "Email"]]]
+    for appointment in all_appointments:
+        appointment_rows.append([
+            paragraph(appointment.get("id")),
+            paragraph(f"{mask_name(appointment.get('name'), mask_pii)} / {mask_patient_id(appointment.get('patient_id'), mask_pii)}"),
+            paragraph(normalize_appointment_type(appointment.get("type", "Unknown")) or appointment.get("type", "Unknown")),
+            paragraph(appointment.get("datetime")),
+            paragraph(str(appointment.get("status", "unknown")).upper()),
+            paragraph(mask_phone(appointment.get("phone"), mask_pii)),
+            paragraph(mask_email(appointment.get("email"), mask_pii)),
+        ])
+    appointment_table = Table(appointment_rows, colWidths=[24 * mm, 48 * mm, 32 * mm, 38 * mm, 24 * mm, 31 * mm, 47 * mm], repeatRows=1)
+    appointment_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1976D2")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#B0BEC5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F9FC")]),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story += [appointment_table, PageBreak(), Paragraph("Visitor, Feedback & Email Records", styles["SectionTitle"])]
+
+    visitor_rows = [[paragraph(header, "Metric") for header in ["IP Address", "First Seen", "Last Seen", "Hits"]]]
+    for visitor in visitor_ips:
+        visitor_rows.append([paragraph(mask_ip(visitor.get("ip_address"), mask_pii)), paragraph(visitor.get("first_seen")), paragraph(visitor.get("last_seen")), paragraph(visitor.get("hit_count", 1))])
+    if len(visitor_rows) > 1:
+        visitor_table = Table(visitor_rows, colWidths=[50 * mm, 55 * mm, 55 * mm, 20 * mm], repeatRows=1)
+        visitor_table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0097A7")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#B0BEC5")), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F9FC")])]))
+        story += [Paragraph("Visitor IP Audit", styles["SectionTitle"]), visitor_table, Spacer(1, 5 * mm)]
+
+    feedback_rows = [[paragraph(header, "Metric") for header in ["ID", "Email", "Rating", "Booking", "Comments"]]]
+    for record in feedback_records:
+        feedback_rows.append([paragraph(record.get("id")), paragraph(mask_email(record.get("email"), mask_pii)), paragraph(record.get("rating")), paragraph(record.get("booking_success")), paragraph(anonymize_text(record.get("message") or record.get("additional_feedback"), mask_pii))])
+    if len(feedback_rows) > 1:
+        feedback_table = Table(feedback_rows, colWidths=[15 * mm, 48 * mm, 18 * mm, 42 * mm, 85 * mm], repeatRows=1)
+        feedback_table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#7B1FA2")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#B0BEC5")), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F9FC")])]))
+        story += [Paragraph("Feedback Records", styles["SectionTitle"]), feedback_table]
+
+    document.build(story)
+    return output.getvalue()
 
 
 # ============================================================================
