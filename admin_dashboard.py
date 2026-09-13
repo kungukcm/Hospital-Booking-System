@@ -459,6 +459,14 @@ def _build_html_line_chart(title: str, data: Dict[str, Any], line_color: str = "
     """
 
 
+def _safe_number(value: Any, default: float = 0.0) -> float:
+    """Convert nullable API values to numbers for report formatting."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     """Create a complete, high-quality, multi-colored management HTML report."""
     quality = report.get("chat_quality", {})
@@ -477,7 +485,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     error_fallback_pct = quality.get("error_fallback_rate_pct", round((error_fallbacks / total_chats * 100), 1) if total_chats else 0.0)
     slow_chats = quality.get("slow_response_count", 0)
     slow_chats_pct = quality.get("slow_response_rate_pct", round((slow_chats / total_chats * 100), 1) if total_chats else 0.0)
-    avg_latency = quality.get("avg_response_time_ms", 0)
+    avg_latency = _safe_number(quality.get("avg_response_time_ms"))
 
     email_counts = {
         "Delivered / Sent": sum(item.get("status") == "sent" for item in emails),
@@ -650,7 +658,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
                 <td>{escape(str(apt.get('datetime', 'N/A')))}</td>
                 <td>{status_badge}</td>
                 <td>{c_phone}<br><small class="muted">{c_email}</small></td>
-                <td>{apt.get('predicted_wait_minutes', 0):.0f} min</td>
+                <td>{_safe_number(apt.get('predicted_wait_minutes')):.0f} min</td>
                 <td>{reason}</td>
             </tr>
             """
@@ -1835,7 +1843,8 @@ def show_admin_dashboard():
                         mime="application/pdf",
                         use_container_width=True,
                     )
-                except RuntimeError as pdf_error:
+                except Exception as pdf_error:
+                    logger.exception("PDF report generation failed")
                     st.error(str(pdf_error))
             
             st.divider()
