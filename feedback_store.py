@@ -238,7 +238,7 @@ def list_email_notifications(limit: int = 200) -> List[Dict[str, Any]]:
 
 
 def get_chat_quality_stats() -> Dict[str, Any]:
-    """Aggregate metrics for the admin dashboard: responsiveness and flagged/hallucination rate."""
+    """Aggregate metrics for the admin dashboard: responsiveness, error fallbacks, and quality."""
     initialize_store()
     with _connection() as connection:
         total = connection.execute("SELECT COUNT(*) AS c FROM chat_logs").fetchone()["c"]
@@ -246,18 +246,50 @@ def get_chat_quality_stats() -> Dict[str, Any]:
         avg_ms_row = connection.execute(
             "SELECT AVG(response_time_ms) AS avg_ms FROM chat_logs WHERE response_time_ms IS NOT NULL"
         ).fetchone()
+        
+        error_fallback_count = connection.execute(
+            """SELECT COUNT(*) AS c FROM chat_logs 
+               WHERE flag_reason LIKE '%error_or_fallback_response%' 
+                  OR flag_reason LIKE '%error%' 
+                  OR flag_reason LIKE '%fallback%'"""
+        ).fetchone()["c"]
+        
         slow = connection.execute(
-            "SELECT COUNT(*) AS c FROM chat_logs WHERE response_time_ms >= ?",
+            "SELECT COUNT(*) AS c FROM chat_logs WHERE response_time_ms >= ? OR flag_reason LIKE '%slow%'",
             (SLOW_RESPONSE_THRESHOLD_MS,),
         ).fetchone()["c"]
+
+        empty = connection.execute(
+            "SELECT COUNT(*) AS c FROM chat_logs WHERE flag_reason LIKE '%empty%'",
+        ).fetchone()["c"]
+
+        successful = max(0, total - flagged)
+
+        # Response time distribution buckets
+        fast_count = connection.execute(
+            "SELECT COUNT(*) AS c FROM chat_logs WHERE response_time_ms IS NOT NULL AND response_time_ms < 1000"
+        ).fetchone()["c"]
+        normal_count = connection.execute(
+            "SELECT COUNT(*) AS c FROM chat_logs WHERE response_time_ms >= 1000 AND response_time_ms < 3000"
+        ).fetchone()["c"]
+        moderate_count = connection.execute(
+            "SELECT COUNT(*) AS c FROM chat_logs WHERE response_time_ms >= 3000 AND response_time_ms < 8000"
+        ).fetchone()["c"]
+        slow_bucket_count = connection.execute(
+            "SELECT COUNT(*) AS c FROM chat_logs WHERE response_time_ms >= 8000"
+        ).fetchone()["c"]
+
         recent_flagged = connection.execute(
             """SELECT id, ip_address, user_message, assistant_response, created_at, response_time_ms, flag_reason
-               FROM chat_logs WHERE flagged = 1 ORDER BY id DESC LIMIT 20"""
+               FROM chat_logs WHERE flagged = 1 ORDER BY id DESC LIMIT 50"""
         ).fetchall()
+        
         performance_trend = connection.execute(
             """SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS chats,
-                 ROUND(AVG(response_time_ms), 0) AS avg_response_time_ms
-               FROM chat_logs WHERE response_time_ms IS NOT NULL
+                 ROUND(AVG(response_time_ms), 0) AS avg_response_time_ms,
+                 SUM(CASE WHEN flag_reason LIKE '%error%' OR flag_reason LIKE '%fallback%' THEN 1 ELSE 0 END) AS error_fallbacks,
+                 SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count
+               FROM chat_logs
                GROUP BY substr(created_at, 1, 10) ORDER BY date"""
         ).fetchall()
 
@@ -265,8 +297,21 @@ def get_chat_quality_stats() -> Dict[str, Any]:
             "total_chats": total,
             "flagged_count": flagged,
             "flagged_rate_pct": round((flagged / total) * 100, 1) if total else 0.0,
-            "avg_response_time_ms": round(avg_ms_row["avg_ms"], 0) if avg_ms_row["avg_ms"] is not None else None,
+            "successful_count": successful,
+            "successful_rate_pct": round((successful / total) * 100, 1) if total else 0.0,
+            "error_fallback_count": error_fallback_count,
+            "error_fallback_rate_pct": round((error_fallback_count / total) * 100, 1) if total else 0.0,
             "slow_response_count": slow,
+            "slow_response_rate_pct": round((slow / total) * 100, 1) if total else 0.0,
+            "empty_response_count": empty,
+            "empty_response_rate_pct": round((empty / total) * 100, 1) if total else 0.0,
+            "avg_response_time_ms": round(avg_ms_row["avg_ms"], 0) if avg_ms_row["avg_ms"] is not None else None,
+            "latency_distribution": {
+                "< 1s (Fast)": fast_count,
+                "1-3s (Normal)": normal_count,
+                "3-8s (Moderate)": moderate_count,
+                "> 8s (Slow)": slow_bucket_count,
+            },
             "recent_flagged": [dict(row) for row in recent_flagged],
             "performance_trend": [dict(row) for row in performance_trend],
         }
@@ -326,8 +371,9 @@ def get_system_report_data() -> Dict[str, Any]:
         "chat_quality": get_chat_quality_stats(),
         "language": get_language_stats(),
         "feedback": get_feedback_stats(),
-        "visitor_ips": list_visitor_ips(),
-        "email_notifications": list_email_notifications(),
+        "feedback_records": list_feedback(limit=1000),
+        "visitor_ips": list_visitor_ips(limit=1000),
+        "email_notifications": list_email_notifications(limit=1000),
     }
 
 

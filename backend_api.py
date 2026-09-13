@@ -584,11 +584,16 @@ async def admin_get_system_report(admin_user: str = Depends(verify_admin_auth)):
         "total": len(appointments),
         "confirmed": sum(item.get("status") == "confirmed" for item in appointments),
         "pending": sum(item.get("status") == "pending" for item in appointments),
+        "cancelled": sum(item.get("status") == "cancelled" for item in appointments),
         "by_type": {
             appointment_type: sum(item.get("type") == appointment_type for item in appointments)
             for appointment_type in {item.get("type", "unknown") for item in appointments}
         },
+        "all_appointments": appointments,
     }
+    report["feedback_records"] = list_feedback(limit=1000)
+    report["visitor_ips"] = list_visitor_ips(limit=1000)
+    report["email_notifications"] = list_email_notifications(limit=1000)
     report["system_status"] = {
         "api_status": "operational",
         "knowledge_base_initialized": os.path.exists("hospital_vector_store"),
