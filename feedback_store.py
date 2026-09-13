@@ -22,6 +22,8 @@ SWAHILI_MARKERS = {
     "habari", "naweza", "nataka", "tafadhali", "miadi", "matibabu",
     "hospitali", "malipo", "lipia", "huduma", "daktari", "asante",
     "saratani", "nina", "kwa", "ya", "na", "au", "ndiyo", "hapana",
+    "jambo", "hujambo", "mambo", "shikamoo", "karibu", "kuhusu", "kusaidia",
+    "panga", "kupanga", "tafuta", "wapi", "lini", "leo", "kesho", "muda",
 }
 
 # Structured multiple-choice feedback questions, in submission order.

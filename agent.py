@@ -112,7 +112,7 @@ def is_greeting_or_social_message(message_content: str) -> bool:
 
     greeting_markers = [
         'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
-        'habari', 'mambo', 'jambo', 'salaam', 'hujambo',
+        'habari', 'mambo', 'jambo', 'salaam', 'hujambo', 'shikamoo',
         'how are you', 'howdy', 'greetings'
     ]
     return any(re.search(rf"\b{re.escape(marker)}\b", text) for marker in greeting_markers)
@@ -541,7 +541,10 @@ def is_message_in_swahili(message_content: str) -> bool:
     ]
     
     text = normalize_text(message_content)
-    swahili_count = sum(1 for marker in swahili_markers if marker in text)
+    swahili_count = sum(
+        1 for marker in swahili_markers
+        if re.search(rf"\b{re.escape(marker)}\b", text)
+    )
     return swahili_count >= 1
 
 def is_swahili_context(messages: List[Any], preserve_in_booking: bool = False) -> bool:
@@ -569,7 +572,10 @@ def is_swahili_context(messages: List[Any], preserve_in_booking: bool = False) -
     
     text = normalize_text(getattr(last_user_message, "content", ""))
     # Count how many Swahili markers appear in THIS message
-    swahili_count = sum(1 for marker in swahili_markers if marker in text)
+    swahili_count = sum(
+        1 for marker in swahili_markers
+        if re.search(rf"\b{re.escape(marker)}\b", text)
+    )
     
     # If current message has clear Swahili markers, use that
     if swahili_count >= 1:
@@ -797,8 +803,8 @@ def call_caller_model(state: AgentState) -> AgentState:
         return {
             "messages": messages + [
                 AIMessage(content=localized_text(
-                    "Hello! I can help with hospital information, locations, contact details, and appointment booking.",
-                    "Habari! Naweza kukusaidia kuhusu taarifa za hospitali, maeneo, mawasiliano, na kupanga miadi.",
+                    "Hello! How can I help you today? I can answer hospital questions or help you book an appointment.",
+                    "Habari! Ninawezaje kukusaidia leo? Naweza kujibu maswali kuhusu hospitali au kukusaidia kupanga miadi.",
                     greeting_sw_lang,
                 ))
             ],

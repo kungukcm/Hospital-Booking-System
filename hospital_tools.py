@@ -46,6 +46,26 @@ def is_swahili_query(query: str) -> bool:
     )
 
 
+def format_sources(retrieved_results: list, limit: int = 3) -> str:
+    """Format citations only from documents actually retrieved for this query."""
+    sources = []
+    seen = set()
+    for doc, _, _ in retrieved_results[:limit]:
+        source = doc.metadata.get("source", "Unknown")
+        page = doc.metadata.get("page", "N/A")
+        key = (source, page)
+        if key in seen:
+            continue
+        seen.add(key)
+        if source.startswith("http"):
+            citation = source
+        else:
+            filename = source.split("\\")[-1] if "\\" in source else source.split("/")[-1]
+            citation = f"{filename} (Page {page})" if page != "N/A" else filename
+        sources.append(f"• {citation}")
+    return "\n\nSources:\n" + "\n".join(sources) if sources else ""
+
+
 def is_payment_query(query: str) -> bool:
     """Detect payment-method and payment-procedure questions."""
     text = (query or "").lower()
@@ -319,7 +339,7 @@ def search_hospital_information(query: str) -> str:
                 "along Northern Bypass Road.\n"
                 "Phone: 1558 (toll-free local) or +254 111 138106 (international).\n"
                 "Email: imagingcentre@kutrrh.go.ke\n\n"
-                "Source: https://imaging.kutrrh.go.ke/"
+                + format_sources(selected_results)
             )
 
         # For CEO/leadership questions, strongly prioritize website sources over PDFs
@@ -350,7 +370,7 @@ def search_hospital_information(query: str) -> str:
                     "KUTRRH is situated in the north-western part of Kenyatta University. "
                     "The main entrance is along Northern Bypass road, in the Kahawa West area of Nairobi."
                 )
-            return location_answer + "\n\nSources:\n• Hospital profile_251230_205707.pdf (Physical location)"
+            return location_answer + format_sources(selected_results)
         if is_contact_query and any(term in query_lower for term in [
             "email", "barua pepe", "postal", "posta", "anwani", "sanduku la posta"
         ]):
@@ -369,7 +389,7 @@ def search_hospital_information(query: str) -> str:
                     "Email: customercare@kutrrh.go.ke\n"
                     "Postal address: P.O. Box 7674 - 00100, GPO Nairobi, Northern Bypass Rd., Kahawa West, Nairobi."
                 )
-            return contact_answer + "\n\nSources:\n• https://www.kutrrh.go.ke/contacts/"
+            return contact_answer + format_sources(selected_results)
         elif (
             "ceo" in query_lower or "chief executive" in query_lower or "director" in query_lower or "management" in query_lower or "leadership" in query_lower or "board" in query_lower or any(term in query_lower for term in [
                 "mkurugenzi mtendaji", "mkurugenzi mkuu", "mwenyekiti wa bodi", "mwenyekiti", "mkurugenzi wa huduma za uuguzi", "mkurugenzi wa uuguzi", "mkurugenzi"
@@ -407,7 +427,11 @@ def search_hospital_information(query: str) -> str:
                 if "board" in query_lower or "chair" in query_lower
                 else "https://www.kutrrh.go.ke/the-executive/"
             )
-            return targeted_leadership_answer + f"\n\nSources:\n• {source_url}"
+            leadership_sources = [
+                item for item in selected_results
+                if source_url.lower() in item[0].metadata.get("source", "").lower()
+            ] or selected_results
+            return targeted_leadership_answer + format_sources(leadership_sources)
 
         # Use LLM to extract the exact answer from the retrieved passages
         if synthesis_llm:
