@@ -134,7 +134,12 @@ def anonymize_text(text: Optional[str], enabled: bool = True) -> str:
 # ============================================================================
 
 PALETTES = {
-    "vibrant": ["#1976D2", "#2E7D32", "#F57C00", "#7B1FA2", "#0097A7", "#D32F2F", "#C2185B", "#388E3C", "#5D4037", "#0288D1"],
+    "vibrant": [
+        "#1976D2", "#2E7D32", "#F57C00", "#7B1FA2", "#0097A7", "#D32F2F",
+        "#C2185B", "#388E3C", "#5D4037", "#0288D1", "#6A1B9A", "#00838F",
+        "#EF6C00", "#AD1457", "#4527A0", "#00695C", "#9E9D24", "#4E342E",
+        "#1565C0", "#558B2F", "#C62828", "#283593", "#00897B", "#F9A825",
+    ],
     "status": ["#2E7D32", "#F57C00", "#D32F2F", "#757575"],
     "quality": ["#2E7D32", "#D32F2F", "#F57C00", "#7B1FA2", "#0097A7"],
 }
@@ -157,11 +162,17 @@ def render_colored_bar_chart(
         return
 
     legend_title = legend_title or category_col
+    categories = [str(value) for value in df[category_col].tolist()]
+    color_scale = alt.Scale(
+        domain=categories,
+        range=PALETTES["vibrant"][:len(categories)] if len(categories) <= len(PALETTES["vibrant"]) else None,
+        scheme=None if len(categories) <= len(PALETTES["vibrant"]) else color_scheme,
+    )
     if horizontal:
         bars = alt.Chart(df).mark_bar(cornerRadiusTopRight=6, cornerRadiusBottomRight=6).encode(
-            y=alt.Y(f"{category_col}:N", sort='-x', title=y_label or category_col, axis=alt.Axis(labelLimit=250)),
+            y=alt.Y(f"{category_col}:N", sort='-x', title=y_label or category_col, axis=alt.Axis(labelLimit=0, labelOverlap=False)),
             x=alt.X(f"{value_col}:Q", title=x_label or value_col),
-            color=alt.Color(f"{category_col}:N", scale=alt.Scale(scheme=color_scheme), legend=alt.Legend(title=legend_title, orient="right")),
+            color=alt.Color(f"{category_col}:N", scale=color_scale, legend=alt.Legend(title=legend_title, orient="right")),
             tooltip=[f"{category_col}:N", f"{value_col}:Q"]
         )
         text = alt.Chart(df).mark_text(dx=12, fontSize=11, fontWeight="bold", color="#152238").encode(
@@ -171,9 +182,9 @@ def render_colored_bar_chart(
         )
     else:
         bars = alt.Chart(df).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
-            x=alt.X(f"{category_col}:N", sort='-y', title=x_label or category_col, axis=alt.Axis(labelAngle=-25, labelLimit=200)),
+            x=alt.X(f"{category_col}:N", sort='-y', title=x_label or category_col, axis=alt.Axis(labelAngle=-25, labelLimit=0, labelOverlap=False)),
             y=alt.Y(f"{value_col}:Q", title=y_label or value_col),
-            color=alt.Color(f"{category_col}:N", scale=alt.Scale(scheme=color_scheme), legend=alt.Legend(title=legend_title, orient="right")),
+            color=alt.Color(f"{category_col}:N", scale=color_scale, legend=alt.Legend(title=legend_title, orient="right")),
             tooltip=[f"{category_col}:N", f"{value_col}:Q"]
         )
         text = alt.Chart(df).mark_text(dy=-8, fontSize=11, fontWeight="bold", color="#152238").encode(
@@ -184,7 +195,7 @@ def render_colored_bar_chart(
 
     chart = (bars + text).properties(
         title=alt.TitleParams(text=title, fontSize=14, fontWeight="bold", color="#152238"),
-        height=height
+        height=max(height, len(categories) * 34 if horizontal else height)
     ).configure_view(strokeWidth=0)
 
     st.altair_chart(chart, use_container_width=True)
@@ -992,7 +1003,8 @@ def show_admin_dashboard():
                     y_label="Total Appointments",
                     legend_title="Specialty",
                     color_scheme="tableau10",
-                    height=320
+                    height=320,
+                    horizontal=True
                 )
             else:
                 st.info("No appointments recorded yet.")
