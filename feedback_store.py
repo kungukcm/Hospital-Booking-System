@@ -474,16 +474,22 @@ def list_chat_logs(limit: int = 500, ip_address: Optional[str] = None) -> List[D
     with _connection() as connection:
         if ip_address:
             rows = connection.execute(
-                """SELECT id, ip_address, user_message, assistant_response, created_at,
-                          response_time_ms, flagged, flag_reason
+                  """SELECT id, ip_address, user_message, assistant_response, created_at,
+                         response_time_ms, flagged, flag_reason, language
                    FROM chat_logs WHERE ip_address = ? ORDER BY id DESC LIMIT ?""",
                 (ip_address, max(1, min(limit, 2000))),
             ).fetchall()
         else:
             rows = connection.execute(
-                """SELECT id, ip_address, user_message, assistant_response, created_at,
-                          response_time_ms, flagged, flag_reason
+                  """SELECT id, ip_address, user_message, assistant_response, created_at,
+                         response_time_ms, flagged, flag_reason, language
                    FROM chat_logs ORDER BY id DESC LIMIT ?""",
                 (max(1, min(limit, 2000)),),
             ).fetchall()
-        return [dict(row) for row in rows]
+        logs = []
+        for row in rows:
+            log = dict(row)
+            # Older rows may predate the language column or have no stored value.
+            log["language"] = log.get("language") or detect_message_language(log.get("user_message", ""))
+            logs.append(log)
+        return logs
