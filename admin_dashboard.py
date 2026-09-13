@@ -1081,9 +1081,12 @@ def build_system_report_pdf(report: dict, mask_pii: bool = True) -> bytes:
         dest=output,
         encoding="utf-8",
     )
-    if result.err:
+    pdf_bytes = output.getvalue()
+    if result.err and not pdf_bytes.startswith(b"%PDF-"):
         raise RuntimeError(f"PDF export failed with {result.err} conversion error(s).")
-    return output.getvalue()
+    if result.err:
+        logger.warning("PDF export completed with %s non-fatal layout warning(s)", result.err)
+    return pdf_bytes
 
 
 # ============================================================================
