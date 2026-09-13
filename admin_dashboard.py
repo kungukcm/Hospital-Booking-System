@@ -428,6 +428,64 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
         "Empty Responses": quality.get("empty_response_count", 0),
     }
 
+    language_counts = language.get("language_counts", {})
+    language_success = language.get("successful_responses", {})
+    language_success_rates = language.get("success_rate_pct", {})
+    language_switches = language.get("switches", {})
+    language_switch_rates = language.get("switch_rate_pct", {})
+    language_success_chart = {
+        "English successful": language_success.get("english", 0),
+        "Swahili successful": language_success.get("swahili", 0),
+    }
+    language_switch_chart = {
+        "English to Swahili": language_switches.get("english_to_swahili", 0),
+        "Swahili to English": language_switches.get("swahili_to_english", 0),
+    }
+    performance_trend = quality.get("performance_trend", [])
+    performance_chart = {
+        str(item.get("date", "Unknown")): item.get("avg_response_time_ms", 0) or 0
+        for item in performance_trend
+    }
+    performance_error_chart = {
+        str(item.get("date", "Unknown")): item.get("error_fallbacks", 0) or 0
+        for item in performance_trend
+    }
+    latency_values = [item.get("avg_response_time_ms") for item in performance_trend if item.get("avg_response_time_ms") is not None]
+    performance_summary = (
+        f"<p><b>Average response time:</b> {avg_latency:.0f} ms "
+        f"| <b>Fastest daily average:</b> {min(latency_values):.0f} ms "
+        f"| <b>Slowest daily average:</b> {max(latency_values):.0f} ms "
+        f"| <b>Days measured:</b> {len(latency_values)}</p>"
+        if latency_values
+        else "<p><b>Performance records:</b> No timed response records available.</p>"
+    )
+    language_summary = f"""
+    <div class="card">
+        <h2>🗣️ Language Analytics</h2>
+        <p><b>Total language-classified chats:</b> {language.get('total_chats', total_chats)} "
+        f"| <b>English:</b> {language_counts.get('english', 0)} ({language_success_rates.get('english', 0)}% success) "
+        f"| <b>Swahili:</b> {language_counts.get('swahili', 0)} ({language_success_rates.get('swahili', 0)}% success)</p>
+        <p><b>English to Swahili switches:</b> {language_switches.get('english_to_swahili', 0)} ({language_switch_rates.get('english_to_swahili', 0)}%) "
+        f"| <b>Swahili to English switches:</b> {language_switches.get('swahili_to_english', 0)} ({language_switch_rates.get('swahili_to_english', 0)}%)</p>
+        <div class="grid-2">
+            {_build_html_bar_chart('Chats by Language', language_counts, ['#1976D2', '#7B1FA2'])}
+            {_build_html_bar_chart('Successful Responses by Language', language_success_chart, ['#2E7D32', '#0097A7'])}
+            {_build_html_bar_chart('Language Switches', language_switch_chart, ['#F57C00', '#C2185B'])}
+        </div>
+    </div>
+    """
+    performance_analytics = f"""
+    <div class="card">
+        <h2>⚙️ System Performance Analytics</h2>
+        {performance_summary}
+        <p class="muted">Daily averages and fallback counts are based on timed chat records stored by the system.</p>
+        <div class="grid-2">
+            {_build_html_bar_chart('Average Response Time by Day (ms)', performance_chart, ['#1976D2', '#0097A7', '#7B1FA2'])}
+            {_build_html_bar_chart('Error / Fallback Responses by Day', performance_error_chart, ['#D32F2F', '#F57C00', '#C2185B'])}
+        </div>
+    </div>
+    """
+
     feedback_charts = ""
     for question in feedback_stats.get("questions", []):
         counts = question.get("counts") or {}
@@ -784,14 +842,20 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
 
 <!-- SECTION 3: LANGUAGE USAGE & EMAIL NOTIFICATIONS -->
 <div class="grid-2">
-    {_build_html_bar_chart('Language Distribution', language.get('language_counts', {}), ['#1976D2', '#7B1FA2'])}
+    {_build_html_bar_chart('Language Distribution', language_counts, ['#1976D2', '#7B1FA2'])}
     {_build_html_bar_chart('Email Confirmation Delivery Status', email_counts, ['#2E7D32', '#D32F2F', '#757575'])}
 </div>
 
-<!-- SECTION 4: FEEDBACK STATISTICS & VISUAL ANALYSIS -->
+<!-- SECTION 4: LANGUAGE ANALYTICS -->
+{language_summary}
+
+<!-- SECTION 5: SYSTEM PERFORMANCE ANALYTICS -->
+{performance_analytics}
+
+<!-- SECTION 6: FEEDBACK STATISTICS & VISUAL ANALYSIS -->
 {feedback_analytics}
 
-<!-- SECTION 5: COMPLETE APPOINTMENTS TABLE (ALL BOOKED, PENDING, CANCELLED) -->
+<!-- SECTION 7: COMPLETE APPOINTMENTS TABLE (ALL BOOKED, PENDING, CANCELLED) -->
 <div class="card">
     <h2>📅 Complete Appointments Record (Booked, Pending & Cancelled)</h2>
     <p class="muted">All appointment bookings stored in the hospital scheduling database with current status and patient references.</p>
@@ -816,7 +880,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     </div>
 </div>
 
-<!-- SECTION 6: VISITOR IP AUDIT LOG -->
+<!-- SECTION 8: VISITOR IP AUDIT LOG -->
 <div class="card">
     <h2>🌐 Unique Visitor IP Audit Trail</h2>
     <p class="muted">Audited client IP addresses tracking platform interaction frequency and engagement timestamps.</p>
@@ -837,7 +901,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     </div>
 </div>
 
-<!-- SECTION 7: USER FEEDBACK & EVALUATION RECORDS -->
+<!-- SECTION 9: USER FEEDBACK & EVALUATION RECORDS -->
 <div class="card">
     <h2>📝 User Evaluation & Feedback Records</h2>
     <p class="muted">Structured patient feedback responses evaluating usability, accuracy, queue utility, and satisfaction.</p>
@@ -862,7 +926,7 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     </div>
 </div>
 
-<!-- SECTION 8: EMAIL NOTIFICATION AUDIT -->
+<!-- SECTION 10: EMAIL NOTIFICATION AUDIT -->
 <div class="card">
     <h2>📧 Patient Email Confirmation Delivery Logs</h2>
     <div style="overflow-x: auto;">
