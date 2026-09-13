@@ -25,3 +25,4 @@ sentence-transformers
 langchain-huggingface
 beautifulsoup4
 requests
+xhtml2pdf

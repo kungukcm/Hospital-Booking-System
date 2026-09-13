@@ -1056,6 +1056,28 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
 </html>"""
 
 
+def build_system_report_pdf(report: dict, mask_pii: bool = True) -> bytes:
+    """Convert the complete HTML report to a downloadable PDF."""
+    try:
+        from xhtml2pdf import pisa
+    except ImportError as exc:
+        raise RuntimeError(
+            "PDF export is unavailable because xhtml2pdf is not installed. "
+            "Install the dependencies from requirements.txt."
+        ) from exc
+
+    from io import BytesIO
+    output = BytesIO()
+    result = pisa.CreatePDF(
+        src=build_system_report_html(report, mask_pii=mask_pii),
+        dest=output,
+        encoding="utf-8",
+    )
+    if result.err:
+        raise RuntimeError(f"PDF export failed with {result.err} conversion error(s).")
+    return output.getvalue()
+
+
 # ============================================================================
 # Login Page
 # ============================================================================
@@ -1792,14 +1814,29 @@ def show_admin_dashboard():
         
         if report:
             html_content = build_system_report_html(report, mask_pii=mask_pii)
-            st.download_button(
-                label="📥 Download Full Management Report (HTML)",
-                data=html_content,
-                file_name=f"KUTRRH_System_Management_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                mime="text/html",
-                use_container_width=True,
-                type="primary"
-            )
+            report_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            download_col1, download_col2 = st.columns(2)
+            with download_col1:
+                st.download_button(
+                    label="📥 Download Full Report (HTML)",
+                    data=html_content,
+                    file_name=f"KUTRRH_System_Management_Report_{report_timestamp}.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    type="primary"
+                )
+            with download_col2:
+                try:
+                    pdf_content = build_system_report_pdf(report, mask_pii=mask_pii)
+                    st.download_button(
+                        label="📄 Download Full Report (PDF)",
+                        data=pdf_content,
+                        file_name=f"KUTRRH_System_Management_Report_{report_timestamp}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+                except RuntimeError as pdf_error:
+                    st.error(str(pdf_error))
             
             st.divider()
             st.markdown("### 📋 Executive Summary Preview")

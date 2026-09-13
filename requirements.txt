@@ -22,3 +22,4 @@ langchain-huggingface
 tf-keras
 beautifulsoup4
 requests
+xhtml2pdf
