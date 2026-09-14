@@ -581,13 +581,21 @@ def is_swahili_context(messages: List[Any], preserve_in_booking: bool = False) -
     if swahili_count >= 1:
         return True
     
-    # If preserve_in_booking is True and current message doesn't have markers,
     # If preserve_in_booking is True and current message doesn't have markers (e.g. it's
-    # just a time selection, name, or ID with no language-specific words), fall back to
-    # the most recent PRIOR human message that has actual alphabetic content, so a single
-    # earlier Swahili word doesn't permanently bias later English replies within the same
-    # booking flow.
+    # just a time selection, name, ID, phone, or email with no language-specific words),
+    # fall back to the most recent human message (starting with the current one) that
+    # contains an explicit English or Swahili marker word. Patient details (names,
+    # emails, IDs) are language-neutral and must NOT be treated as an "English signal"
+    # just because they use Latin letters.
     if preserve_in_booking:
+        english_markers = [
+            "the", "and", "want", "need", "please", "would", "book", "appointment",
+            "schedule", "today", "tomorrow", "morning", "afternoon", "evening",
+            "thanks", "thank you", "yes", "hello", "hospital", "service", "clinic",
+            "date", "time", "checkup", "check-up", "doctor", "confirm"
+        ]
+        if any(re.search(rf"\b{re.escape(marker)}\b", text) for marker in english_markers):
+            return False
         human_messages = [m for m in messages if isinstance(m, HumanMessage)]
         for prior in reversed(human_messages[:-1]):
             prior_text = normalize_text(getattr(prior, "content", ""))
@@ -595,9 +603,9 @@ def is_swahili_context(messages: List[Any], preserve_in_booking: bool = False) -
                 continue
             if any(re.search(rf"\b{re.escape(marker)}\b", prior_text) for marker in swahili_markers):
                 return True
-            if re.search(r"[a-z]{3,}", prior_text):
-                # Prior message had real words and none were Swahili; treat as an
-                # explicit English signal and stop looking further back.
+            if any(re.search(rf"\b{re.escape(marker)}\b", prior_text) for marker in english_markers):
+                # Prior message had an explicit English word; treat as an explicit
+                # English signal and stop looking further back.
                 return False
 
     return False
