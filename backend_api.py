@@ -492,12 +492,24 @@ async def admin_get_all_appointments(admin_user: str = Depends(verify_admin_auth
             apt_type = normalize_appointment_type(apt.get('type', 'Unknown')) or 'General Check-up'
             by_type[apt_type] = by_type.get(apt_type, 0) + 1
 
+        confirmed_appointments = [a for a in appointments if a.get('status') == 'confirmed']
+        confirmed_english = len([a for a in confirmed_appointments if (a.get('language') or 'english').lower() != 'swahili'])
+        confirmed_swahili = len([a for a in confirmed_appointments if (a.get('language') or 'english').lower() == 'swahili'])
+        confirmed_total = len(confirmed_appointments) or 1
+        by_language = {
+            "confirmed_english": confirmed_english,
+            "confirmed_swahili": confirmed_swahili,
+            "confirmed_english_pct": round((confirmed_english / confirmed_total) * 100, 1),
+            "confirmed_swahili_pct": round((confirmed_swahili / confirmed_total) * 100, 1),
+        }
+
         return {
             "total_appointments": total,
             "confirmed": confirmed,
             "pending": pending,
             "cancelled": cancelled,
             "by_type": by_type,
+            "by_language": by_language,
             "appointments": appointments[:100],  # Return last 100 for performance
             "generated_at": datetime.now().isoformat()
         }

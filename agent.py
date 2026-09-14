@@ -1009,6 +1009,7 @@ def call_caller_model(state: AgentState) -> AgentState:
                     "appointment_day": date_obj.day,
                     "appointment_hour": selected_hour,
                     "appointment_minute": selected_minute,
+                    "language": "swahili" if sw_lang else "english",
                 })
                 final_booking_msg = str(booking_result)
                 if sw_lang:

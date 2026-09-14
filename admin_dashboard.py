@@ -1404,6 +1404,32 @@ def show_admin_dashboard():
                 height=320
             )
 
+        st.divider()
+        st.markdown("#### 🗣️ Confirmed Bookings by Language")
+        by_language = apt_data.get("by_language", {})
+        lang_col1, lang_col2, lang_col3 = st.columns(3)
+        with lang_col1:
+            st.metric("Confirmed in English", by_language.get("confirmed_english", 0), delta=f"{by_language.get('confirmed_english_pct', 0)}%")
+        with lang_col2:
+            st.metric("Confirmed in Swahili", by_language.get("confirmed_swahili", 0), delta=f"{by_language.get('confirmed_swahili_pct', 0)}%")
+        with lang_col3:
+            st.metric("Total Confirmed", by_language.get("confirmed_english", 0) + by_language.get("confirmed_swahili", 0))
+
+        df_booking_lang = pd.DataFrame([
+            {"Language": "English", "Confirmed Bookings": by_language.get("confirmed_english", 0)},
+            {"Language": "Swahili", "Confirmed Bookings": by_language.get("confirmed_swahili", 0)},
+        ])
+        booking_lang_scale = alt.Scale(domain=["English", "Swahili"], range=["#1976D2", "#7B1FA2"])
+        render_donut_chart(
+            df_booking_lang,
+            category_col="Language",
+            value_col="Confirmed Bookings",
+            title="Confirmed Bookings: English vs Swahili",
+            legend_title="Language",
+            color_scale=booking_lang_scale,
+            height=300
+        )
+
     # ====================================================================
     # Tab 2: 📅 Appointments Management
     # ====================================================================

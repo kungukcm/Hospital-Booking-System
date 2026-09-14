@@ -27,7 +27,8 @@ config = AppConfig()
 @tool
 def book_appointment(person_name: str, patient_id: str, phone_number: str, email_address: str, 
                      appointment_type: str, appointment_year: int, appointment_month: int,
-                     appointment_day: int, appointment_hour: int, appointment_minute: int):
+                     appointment_day: int, appointment_hour: int, appointment_minute: int,
+                     language: str = "english"):
     """
     Book an appointment with AI-predicted waiting time.
     Requires patient information: name, ID, phone, and email.
@@ -83,7 +84,8 @@ def book_appointment(person_name: str, patient_id: str, phone_number: str, email
             "confidence": round(confidence, 2),
             "congestion_level": congestion['level'],
             "duration_minutes": 30,
-            "status": "confirmed"
+            "status": "confirmed",
+            "language": "swahili" if str(language).strip().lower() == "swahili" else "english"
         }
         
         # Save to database
