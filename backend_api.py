@@ -31,6 +31,7 @@ from feedback_store import (
     detect_message_language,
     get_language_stats,
     get_system_report_data,
+    get_appointment_language_map,
     list_email_notifications,
     list_visitor_ips,
 )
@@ -470,6 +471,20 @@ async def rebuild_knowledge_base(admin_user: str = Depends(verify_admin_auth)):
         raise HTTPException(status_code=500, detail=f"Rebuild failed: {str(e)}")
 
 
+def _resolve_booking_language(appointment: Dict[str, Any], language_map: Dict[str, str]) -> str:
+    """Resolve the actual confirmation language for a booking.
+
+    Prefers the language recorded in the chat log that produced the
+    confirmation (looked up by appointment ID), since that reflects the real
+    conversation. Falls back to the appointment's own 'language' field for
+    records with no matching chat log, then defaults to English.
+    """
+    mapped = language_map.get(appointment.get("id"))
+    if mapped:
+        return mapped
+    return (appointment.get("language") or "english").lower()
+
+
 @app.get("/admin/appointments", response_model=Dict[str, Any])
 async def admin_get_all_appointments(admin_user: str = Depends(verify_admin_auth)):
     """
@@ -493,8 +508,10 @@ async def admin_get_all_appointments(admin_user: str = Depends(verify_admin_auth
             by_type[apt_type] = by_type.get(apt_type, 0) + 1
 
         confirmed_appointments = [a for a in appointments if a.get('status') == 'confirmed']
-        confirmed_english = len([a for a in confirmed_appointments if (a.get('language') or 'english').lower() != 'swahili'])
-        confirmed_swahili = len([a for a in confirmed_appointments if (a.get('language') or 'english').lower() == 'swahili'])
+        appointment_language_map = get_appointment_language_map()
+        confirmed_languages = [_resolve_booking_language(a, appointment_language_map) for a in confirmed_appointments]
+        confirmed_english = len([lang for lang in confirmed_languages if lang != 'swahili'])
+        confirmed_swahili = len([lang for lang in confirmed_languages if lang == 'swahili'])
         confirmed_total = len(confirmed_appointments) or 1
         by_language = {
             "confirmed_english": confirmed_english,
@@ -605,8 +622,10 @@ async def admin_get_system_report(admin_user: str = Depends(verify_admin_auth)):
     normalized_types = [normalize_appointment_type(item.get("type", "Unknown")) or "General Check-up" for item in appointments]
     unique_types = sorted(list(set(normalized_types)))
     confirmed_appointments = [a for a in appointments if a.get('status') == 'confirmed']
-    confirmed_english = len([a for a in confirmed_appointments if (a.get('language') or 'english').lower() != 'swahili'])
-    confirmed_swahili = len([a for a in confirmed_appointments if (a.get('language') or 'english').lower() == 'swahili'])
+    appointment_language_map = get_appointment_language_map()
+    confirmed_languages = [_resolve_booking_language(a, appointment_language_map) for a in confirmed_appointments]
+    confirmed_english = len([lang for lang in confirmed_languages if lang != 'swahili'])
+    confirmed_swahili = len([lang for lang in confirmed_languages if lang == 'swahili'])
     confirmed_total = len(confirmed_appointments) or 1
     by_time_slot: Dict[str, int] = {}
     for apt in confirmed_appointments:

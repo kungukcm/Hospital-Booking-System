@@ -1,6 +1,7 @@
 """Persistent feedback and chat audit storage."""
 
 import os
+import re
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -237,6 +238,30 @@ def list_email_notifications(limit: int = 200) -> List[Dict[str, Any]]:
             (max(1, min(limit, 1000)),),
         ).fetchall()
         return [dict(row) for row in rows]
+
+
+def get_appointment_language_map() -> Dict[str, str]:
+    """Derive each booking's actual confirmation language from chat logs.
+
+    Confirmation messages always embed the appointment ID (e.g. "APT_0007")
+    regardless of whether the label was translated to Swahili, so matching the
+    ID directly against the chat log's own tracked language is far more
+    reliable than re-guessing language from stored appointment fields.
+    """
+    initialize_store()
+    with _connection() as connection:
+        rows = connection.execute(
+            "SELECT assistant_response, language, user_message FROM chat_logs "
+            "WHERE assistant_response LIKE '%APT_%' ORDER BY id ASC"
+        ).fetchall()
+
+    language_map: Dict[str, str] = {}
+    for row in rows:
+        response = row["assistant_response"] or ""
+        language = row["language"] or detect_message_language(row["user_message"])
+        for appointment_id in re.findall(r"\bAPT_[A-Z0-9]+\b", response):
+            language_map[appointment_id] = language
+    return language_map
 
 
 def get_chat_quality_stats() -> Dict[str, Any]:
