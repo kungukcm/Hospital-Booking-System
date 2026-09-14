@@ -503,6 +503,15 @@ async def admin_get_all_appointments(admin_user: str = Depends(verify_admin_auth
             "confirmed_swahili_pct": round((confirmed_swahili / confirmed_total) * 100, 1),
         }
 
+        by_time_slot: Dict[str, int] = {}
+        for apt in confirmed_appointments:
+            apt_datetime = apt.get('datetime', '')
+            if 'T' in apt_datetime:
+                time_part = apt_datetime.split('T', 1)[1][:5]
+                if len(time_part) == 5:
+                    by_time_slot[time_part] = by_time_slot.get(time_part, 0) + 1
+        by_time_slot = dict(sorted(by_time_slot.items(), key=lambda item: item[1], reverse=True))
+
         return {
             "total_appointments": total,
             "confirmed": confirmed,
@@ -510,6 +519,7 @@ async def admin_get_all_appointments(admin_user: str = Depends(verify_admin_auth
             "cancelled": cancelled,
             "by_type": by_type,
             "by_language": by_language,
+            "by_time_slot": by_time_slot,
             "appointments": appointments[:100],  # Return last 100 for performance
             "generated_at": datetime.now().isoformat()
         }

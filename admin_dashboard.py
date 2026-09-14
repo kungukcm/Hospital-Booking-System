@@ -1430,6 +1430,35 @@ def show_admin_dashboard():
             height=300
         )
 
+        st.divider()
+        st.markdown("#### ⏰ Most Preferred / Booked Time Slots")
+        by_time_slot = apt_data.get("by_time_slot", {})
+        if by_time_slot:
+            top_slots = dict(list(by_time_slot.items())[:10])
+            slot_col1, slot_col2 = st.columns([2, 1])
+            with slot_col1:
+                df_slots = pd.DataFrame([{"Time Slot": k, "Bookings": v} for k, v in top_slots.items()])
+                render_colored_bar_chart(
+                    df_slots,
+                    category_col="Time Slot",
+                    value_col="Bookings",
+                    title="Top 10 Most Booked Time Slots",
+                    x_label="Time of Day",
+                    y_label="Confirmed Bookings",
+                    legend_title="Time Slot",
+                    color_scheme="tableau20",
+                    height=320,
+                    horizontal=True
+                )
+            with slot_col2:
+                most_popular_time, most_popular_count = next(iter(top_slots.items()))
+                st.metric("Most Booked Slot", most_popular_time, delta=f"{most_popular_count} bookings")
+                st.markdown("**Top 5 Slots**")
+                for slot_time, slot_count in list(top_slots.items())[:5]:
+                    st.caption(f"🕒 {slot_time} — {slot_count} bookings")
+        else:
+            st.info("No confirmed bookings with time data yet.")
+
     # ====================================================================
     # Tab 2: 📅 Appointments Management
     # ====================================================================
