@@ -604,6 +604,18 @@ async def admin_get_system_report(admin_user: str = Depends(verify_admin_auth)):
     appointments = get_appointments(limit=None)
     normalized_types = [normalize_appointment_type(item.get("type", "Unknown")) or "General Check-up" for item in appointments]
     unique_types = sorted(list(set(normalized_types)))
+    confirmed_appointments = [a for a in appointments if a.get('status') == 'confirmed']
+    confirmed_english = len([a for a in confirmed_appointments if (a.get('language') or 'english').lower() != 'swahili'])
+    confirmed_swahili = len([a for a in confirmed_appointments if (a.get('language') or 'english').lower() == 'swahili'])
+    confirmed_total = len(confirmed_appointments) or 1
+    by_time_slot: Dict[str, int] = {}
+    for apt in confirmed_appointments:
+        apt_datetime = apt.get('datetime', '')
+        if 'T' in apt_datetime:
+            time_part = apt_datetime.split('T', 1)[1][:5]
+            if len(time_part) == 5:
+                by_time_slot[time_part] = by_time_slot.get(time_part, 0) + 1
+    by_time_slot = dict(sorted(by_time_slot.items(), key=lambda item: item[1], reverse=True))
     report["appointments"] = {
         "total": len(appointments),
         "confirmed": sum(item.get("status") == "confirmed" for item in appointments),
@@ -613,6 +625,13 @@ async def admin_get_system_report(admin_user: str = Depends(verify_admin_auth)):
             appointment_type: sum(t == appointment_type for t in normalized_types)
             for appointment_type in unique_types
         },
+        "by_language": {
+            "confirmed_english": confirmed_english,
+            "confirmed_swahili": confirmed_swahili,
+            "confirmed_english_pct": round((confirmed_english / confirmed_total) * 100, 1),
+            "confirmed_swahili_pct": round((confirmed_swahili / confirmed_total) * 100, 1),
+        },
+        "by_time_slot": by_time_slot,
         "all_appointments": appointments,
     }
     report["feedback_records"] = list_feedback(limit=1000)

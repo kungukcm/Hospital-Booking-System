@@ -582,24 +582,24 @@ def is_swahili_context(messages: List[Any], preserve_in_booking: bool = False) -
         return True
     
     # If preserve_in_booking is True and current message doesn't have markers,
-    # look back for booking-related assistant messages to detect the booking language
+    # If preserve_in_booking is True and current message doesn't have markers (e.g. it's
+    # just a time selection, name, or ID with no language-specific words), fall back to
+    # the most recent PRIOR human message that has actual alphabetic content, so a single
+    # earlier Swahili word doesn't permanently bias later English replies within the same
+    # booking flow.
     if preserve_in_booking:
-        # Look back through recent messages to find the booking language
-        # Check last 10 messages for assistant prompts about booking details
-        for msg in messages[-10:] if len(messages) > 10 else messages:
-            if isinstance(msg, AIMessage):
-                content = getattr(msg, "content", "")
-                # Check if this is a booking-related prompt
-                if any(phrase in content.lower() for phrase in [
-                    'patient details', 'full name', 'patient id', 'phone number', 'email',
-                    'appointment type', 'preferred date', 'choose one of these slots',
-                    'taarifa za mgonjwa', 'jina kamili', 'namba ya mgonjwa', 'namba ya simu',
-                    'tafadhali', 'miadi'
-                ]):
-                    # Found a booking-related message, check if it's in Swahili
-                    if is_message_in_swahili(content):
-                        return True
-    
+        human_messages = [m for m in messages if isinstance(m, HumanMessage)]
+        for prior in reversed(human_messages[:-1]):
+            prior_text = normalize_text(getattr(prior, "content", ""))
+            if not prior_text:
+                continue
+            if any(re.search(rf"\b{re.escape(marker)}\b", prior_text) for marker in swahili_markers):
+                return True
+            if re.search(r"[a-z]{3,}", prior_text):
+                # Prior message had real words and none were Swahili; treat as an
+                # explicit English signal and stop looking further back.
+                return False
+
     return False
 
 def localized_text(english: str, swahili: str, use_swahili: bool) -> str:

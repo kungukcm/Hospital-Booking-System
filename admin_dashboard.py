@@ -511,6 +511,16 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
         "Cancelled Bookings": sum(item.get("status") == "cancelled" for item in all_appointments),
     }
 
+    # Confirmed bookings by language
+    booking_language_stats = appointments_meta.get("by_language", {})
+    booking_language_chart = {
+        "English": booking_language_stats.get("confirmed_english", 0),
+        "Swahili": booking_language_stats.get("confirmed_swahili", 0),
+    }
+
+    # Most preferred / booked time slots (top 10)
+    booking_time_slot_chart = dict(list(appointments_meta.get("by_time_slot", {}).items())[:10])
+
     quality_chart_data = {
         "Successful Responses": successful_chats,
         "Error / Fallback Responses": error_fallbacks,
@@ -948,6 +958,13 @@ def build_system_report_html(report: dict, mask_pii: bool = True) -> str:
     {_build_html_bar_chart('Appointment Status Distribution', apt_status_counts, ['#2E7D32', '#F57C00', '#D32F2F'])}
 </div>
 
+<!-- SECTION 2b: CONFIRMED BOOKINGS BY LANGUAGE & PREFERRED TIME SLOTS -->
+<div class="grid-2">
+    {_build_html_pie_chart('Confirmed Bookings: English vs Swahili', booking_language_chart, ['#1976D2', '#7B1FA2'])}
+    {_build_html_bar_chart('Most Preferred / Booked Time Slots', booking_time_slot_chart, PALETTES['vibrant'])}
+</div>
+
+
 <!-- SECTION 3: LANGUAGE USAGE & EMAIL NOTIFICATIONS -->
 <div class="grid-2">
     {_build_html_bar_chart('Language Distribution', language_counts, ['#1976D2', '#7B1FA2'])}
@@ -1161,6 +1178,13 @@ def build_system_report_pdf(report: dict, mask_pii: bool = True) -> bytes:
         "Average effort rating": feedback.get("avg_natural_effort") or "N/A",
         "Overall ratings recorded": len([row for row in feedback_records if row.get("rating") is not None]),
     })
+    booking_language = appointments.get("by_language", {})
+    story += statistic_table("Confirmed Bookings by Language", {
+        "Confirmed in English": f"{booking_language.get('confirmed_english', 0)} ({booking_language.get('confirmed_english_pct', 0)}%)",
+        "Confirmed in Swahili": f"{booking_language.get('confirmed_swahili', 0)} ({booking_language.get('confirmed_swahili_pct', 0)}%)",
+    })
+    top_time_slots = dict(list(appointments.get("by_time_slot", {}).items())[:5])
+    story += statistic_table("Top 5 Most Booked Time Slots", top_time_slots or {"No confirmed bookings yet": "-"})
 
     story.append(PageBreak())
     story.append(Paragraph("Complete Appointments Register", styles["SectionTitle"]))
